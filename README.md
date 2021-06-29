@@ -6,6 +6,7 @@ A catalog of data regarding Texas and Harris county that I have found
 
 
 ====================================================
+
 Data from state agencies
 
 -------------
