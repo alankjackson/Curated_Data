@@ -1,0 +1,287 @@
+---
+title: "Texas Death Data 2006-2017"
+author: "Alan Jackson"
+date: "6/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Deaths/"
+
+pop_path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Demographics/"
+Pop <- readRDS(paste0(pop_path, "County_Age_Sex.rds")) %>% 
+  select(FIPS, CNTY_NM, Total_pop) %>% 
+  rename(County=CNTY_NM)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Texas Health Department Death Data
+
+Load, check, and clean up [data downloaded](https://healthdata.dshs.texas.gov/dashboard/births-and-deaths/deaths-2006-2017)
+from the state of Texas health
+department website on deaths for the period 2006-2017 (which is what is
+available as of this date)
+
+To get all the data, it will need to be downloaded many times. Once for the 
+Age distribution, once for sex, once for ethnicity, and once for the total
+per county in hopes of recovering some of the hidden values. All of these
+will eventually get combined. And they must each be downloaded year-by-year.
+Also download the yearly state totals, and the total state totals for 
+imputing the censored values.
+
+Each file is downloaded as what they call a "crosstab", which is just a
+CSV file.
+
+Values less than some magic minimum are converted to "---" in the file,
+while zero is zero. It appears that that magic minimum is 9. But we'll 
+test that.
+
+To begin, we will read in and examine the full state totals.
+
+```{r state totals}
+
+
+
+# Squirrelly encoding seems to flummox read_csv
+#     "---" is the left-censored counts flag
+
+###########     Read in totals for all years and the state
+
+Df_State_tot <- read.delim(paste0(path, "State_allyears_deaths.csv"),
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ) %>% 
+  rename("County"=V1, "Condition"=V2, "Deaths"=V3) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Deaths")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("cc", strrep("i",1)))
+
+###########     Read in totals for each year and the state
+
+Df_State_yr_tot <- 
+  data.frame(year=2006:2017) %>% 
+  mutate(filename=paste0(path, "State_", year, "_deaths.csv")) %>% 
+  mutate(file_contents=map(filename,
+    ~ read.delim(.,
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ))) %>% 
+  select(-filename) %>% 
+    unnest() %>% 
+  rename("County"=V1, "Condition"=V2, "Deaths"=V3) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Deaths")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("icc", strrep("i",1)))
+
+#   Impute values where possible
+
+DF_Impute_Deaths_State_yr <- 
+left_join(Df_State_yr_tot, Df_State_tot, by="Condition") %>% 
+  rename(Deaths=Deaths.x, Tot_deaths=Deaths.y) %>% 
+  select(-County.x, -County.y) %>% 
+  group_by(Condition) %>% 
+    mutate(Sum_na=sum(is.na(Deaths)),
+           Sum=sum(Deaths, na.rm=TRUE),
+           Impute_deaths=Deaths) %>% 
+  ungroup() %>% 
+  mutate(Impute_deaths=ifelse(is.na(Impute_deaths),
+                              (Tot_deaths-Sum)/Sum_na,
+                               Deaths)) 
+
+```
+
+Now county totals for all years
+
+
+```{r county all years}
+
+# Squirrelly encoding seems to flummox read_csv
+#     "---" is the left-censored counts flag
+
+###########     Read in By County
+
+Df_county_all <- read.delim(paste0(path, "County_allyears_deaths.csv"),
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ) %>% 
+  rename("County"=V1, "Condition"=V2, "Deaths"=V3
+         ) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Deaths")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("cc", strrep("i",1))) %>% 
+  #   Add county population number for later use in imputing
+  left_join(., Pop, by="County")
+
+#   Impute values where possible
+
+# For each condition, look only at NA counties, sum up the population 
+# of those counties, and then take the remaining imputed deaths from the
+# state totals, divide by NA population, and then impute to each county
+# that number times the county population.
+
+smart.round <- function(x) {
+  #   from stack overflow 
+  #   https://stackoverflow.com/questions/32544646/round-vector-of-numerics-to-integer-while-preserving-their-sum/32544987#32544987
+  #   re-integer vector components
+  y <- floor(x)
+  indices <- tail(order(x-y), round(sum(x)) - sum(y))
+  y[indices] <- y[indices] + 1
+  
+  y
+}
+
+set_min_one <- function(x){
+  #   Take a vector of integer components that range from 0 up, and 
+  #   steal from the larger values to set all the zeros to one. Used
+  #   for imputing number of deaths.
+  while((z=sum(x==0))>0){
+    twoplus <- min(sum(x>1), z)
+    if (twoplus==0){# something bad happened
+      print("Too many zeros - something bad happened")
+      print(x)
+      break
+    }
+    i_sub <- tail(order(x), twoplus)
+    i_add <- head(order(x), twoplus)
+    x[i_sub] <- x[i_sub] - 1
+    x[i_add] <- x[i_add] + 1
+  }
+  x
+}
+
+DF_Impute_Deaths_County <- 
+left_join(Df_county_all, Df_State_tot, by="Condition") %>% 
+  rename(Deaths=Deaths.x, Tot_deaths=Deaths.y) %>% 
+  select(-County.y) %>% 
+  group_by(Condition) %>% 
+    mutate(Sum_pop=sum(is.na(Deaths)*Total_pop, na.rm=TRUE),
+           Sum=sum(Deaths, na.rm=TRUE),
+           Max_pop=max(Total_pop[is.na(Deaths)]),
+           Impute_deaths=Deaths) %>% 
+  ungroup() %>% 
+  #   weight imputations by population
+  mutate(wgt=9/((Tot_deaths-Sum)*Max_pop/Sum_pop)) %>% 
+  mutate(Impute_deaths=ifelse(is.na(Deaths),
+                              wgt*(Tot_deaths-Sum)*Total_pop/Sum_pop,
+                               Deaths)) %>% 
+  #   Assume any remaining NA's are such rare things that replacing with 1 is good
+  mutate(Impute_deaths=ifelse(is.na(Impute_deaths),
+                              1,
+                              Impute_deaths)) %>% 
+  #   Now turn the weights into integers while preserving the sum
+  group_by(Condition) %>% 
+    mutate(Impute_deaths[is.na(Deaths)]=smart.round(Impute_deaths[is.na(Deaths)])) %>% 
+    #   Now replace zeros with ones by stealing from larger numbers
+    mutate(Impute_deaths[is.na(Deaths)]=set_min_one(Impute_deaths[is.na(Deaths)]))
+  ungroup()
+  
+
+
+
+
+```
+
+
+```{r Keep as examples}
+###########     Read in By Race and County
+
+Df_race <- read.delim(paste0(path, "TableSheet_crosstab(1).csv"),
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ) %>% 
+  rename("County"=V1, "Condition"=V2, "Race_Black"=V3, "Race_Hispanic"=V4, 
+         "Race_Other"=V5, "Race_White"=V6
+         ) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Race_")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("cc", strrep("i",4)))
+
+###########     Read in By Sex and County
+
+Df_sex <- read.delim(paste0(path, "TableSheet_crosstab(2).csv"),
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ) %>% 
+  rename("County"=V1, "Condition"=V2, "Sex_female"=V3, "Sex_male"=V4 
+         ) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Sex_")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("cc", strrep("i",2)))
+
+###########     Read in By Total and County
+
+Df_Total <- read.delim(paste0(path, "TableSheet_crosstab(3).csv"),
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ) %>% 
+  rename("County"=V1, "Condition"=V2, "Total"=V3
+         ) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Total")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("cc", strrep("i",1)))
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+

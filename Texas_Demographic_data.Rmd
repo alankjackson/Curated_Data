@@ -1,0 +1,109 @@
+---
+title: "State Demographic Data"
+author: "Alan Jackson"
+date: "6/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+
+County_path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Counties/"
+Counties <- readRDS(paste0(County_path, "County_Names.rds"))
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  Read data from https://demographics.texas.gov/Data
+
+First we will read in a summary table of population by county and age
+group from the 2010 census, since we need that for other purposes.
+
+```{r read in Pop}
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Demographics/"
+
+
+Columns <- c("GEO.id", "FIPS", "Geography",
+             "Total_pop", "Total_male_pop", "Total_female_pop",
+             "Total_pct", "Total_male_pct", "Total_female_pct",
+             "Total_males_per_females",
+             "Total_pop_under5", "Total_male_pop_under5", "Total_female_pop_under5",
+             "Total_pct_under5", "Total_male_pct_under5", "Total_female_pct_under5",
+             "Total_males_per_females_under5",
+             "Total_pop_5to9", "Total_male_pop_5to9", "Total_female_pop_5to9",
+             "Total_pct_5to9", "Total_male_pct_5to9", "Total_female_pct_5to9",
+             "Total_males_per_females_5to9",
+             "Total_pop_10to14", "Total_male_pop_10to14", "Total_female_pop_10to14",
+             "Total_pct_10to14", "Total_male_pct_10to14", "Total_female_pct_10to14",
+             "Total_males_per_females_10to14",
+             "Total_pop_15to19", "Total_male_pop_15to19", "Total_female_pop_15to19",
+             "Total_pct_15to19", "Total_male_pct_15to19", "Total_female_pct_15to19",
+             "Total_males_per_females_15to19",
+             "Total_pop_20to24", "Total_male_pop_20to24", "Total_female_pop_20to24",
+             "Total_pct_20to24", "Total_male_pct_20to24", "Total_female_pct_20to24",
+             "Total_males_per_females_20to24",
+             "Total_pop_25to29", "Total_male_pop_25to29", "Total_female_pop_25to29",
+             "Total_pct_25to29", "Total_male_pct_25to29", "Total_female_pct_25to29",
+             "Total_males_per_females_25to29",
+             "Total_pop_30to34", "Total_male_pop_30to34", "Total_female_pop_30to34",
+             "Total_pct_30to34", "Total_male_pct_30to34", "Total_female_pct_30to34",
+             "Total_males_per_females_30to34",
+             "Total_pop_35to39", "Total_male_pop_35to39", "Total_female_pop_35to39",
+             "Total_pct_35to39", "Total_male_pct_35to39", "Total_female_pct_35to39",
+             "Total_males_per_females_35to39",
+             "Total_pop_40to44", "Total_male_pop_40to44", "Total_female_pop_40to44",
+             "Total_pct_40to44", "Total_male_pct_40to44", "Total_female_pct_40to44",
+             "Total_males_per_females_40to44",
+             "Total_pop_45to49", "Total_male_pop_45to49", "Total_female_pop_45to49",
+             "Total_pct_45to49", "Total_male_pct_45to49", "Total_female_pct_45to49",
+             "Total_males_per_females_45to49",
+             "Total_pop_50to54", "Total_male_pop_50to54", "Total_female_pop_50to54",
+             "Total_pct_50to54", "Total_male_pct_50to54", "Total_female_pct_50to54",
+             "Total_males_per_females_50to54",
+             "Total_pop_55to59", "Total_male_pop_55to59", "Total_female_pop_55to59",
+             "Total_pct_55to59", "Total_male_pct_55to59", "Total_female_pct_55to59",
+             "Total_males_per_females_55to59",
+             "Total_pop_60to64", "Total_male_pop_60to64", "Total_female_pop_60to64",
+             "Total_pct_60to64", "Total_male_pct_60to64", "Total_female_pct_60to64",
+             "Total_males_per_females_60to64",
+             "Total_pop_65to69", "Total_male_pop_65to69", "Total_female_pop_65to69",
+             "Total_pct_65to69", "Total_male_pct_65to69", "Total_female_pct_65to69",
+             "Total_males_per_females_65to69",
+             "Total_pop_70to74", "Total_male_pop_70to74", "Total_female_pop_70to74",
+             "Total_pct_70to74", "Total_male_pct_70to74", "Total_female_pct_70to74",
+             "Total_males_per_females_70to74",
+             "Total_pop_75to79", "Total_male_pop_75to79", "Total_female_pop_75to79",
+             "Total_pct_75to79", "Total_male_pct_75to79", "Total_female_pct_75to79",
+             "Total_males_per_females_75to79",
+             "Total_pop_80to84", "Total_male_pop_80to84", "Total_female_pop_80to84",
+             "Total_pct_80to84", "Total_male_pct_80to84", "Total_female_pct_80to84",
+             "Total_males_per_females_80to84",
+             "Total_pop_85to89", "Total_male_pop_85to89", "Total_female_pop_85to89",
+             "Total_pct_85to89", "Total_male_pct_85to89", "Total_female_pct_85to89",
+             "Total_males_per_females_85to89",
+             "Total_pop_90plus", "Total_male_pop_90plus", "Total_female_pop_90plus",
+             "Total_pct_90plus", "Total_male_pct_90plus", "Total_female_pct_90plus",
+             "Total_males_per_females_90plus"
+             )
+
+DF <- read_excel(paste0(path, "QT-P1a_AgeGroupsAndSex_SF12010_Shell.xls"),
+                 skip=5, col_names = FALSE, n_max=255)
+
+names(DF) <- Columns
+
+#   Standardize county names
+
+Counties <- Counties %>% select(FIPS_ST_CNTY_CD, CNTY_NM)
+
+DF <- left_join(DF, Counties, by=c("FIPS"="FIPS_ST_CNTY_CD")) %>% 
+  select(-Geography) %>% 
+  relocate(CNTY_NM)
+
+DF <- DF[-1,] # drop "Texas" row leaving only counties
+  
+saveRDS(DF, paste0(path, "County_Age_Sex.rds"))
+
+```
+

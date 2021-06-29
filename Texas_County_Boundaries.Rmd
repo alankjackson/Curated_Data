@@ -1,0 +1,37 @@
+---
+title: "Texas County Boundaries"
+author: "Alan Jackson"
+date: "6/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Counties/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    Read in county files
+
+Read in two file, the county file by csv for building a table of standard
+county names and FIP code correspondence, and also then read in the shapefile
+for actually drawing county outlines on a map.
+
+```{r read CSV}
+
+Counties <- read_csv(paste0(path, "Texas_County_Boundaries.csv")) %>% 
+  select(-SHAPE_Length, -SHAPE_Area)
+
+# The state has problems spelling this corectly
+
+Counties$CNTY_NM[Counties$CNTY_NM=="De Witt"] <- "DeWitt"
+
+# Save file out
+
+saveRDS(Counties, paste0(path, "County_Names.rds"))
+
+```
+
