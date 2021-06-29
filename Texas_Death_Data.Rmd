@@ -148,7 +148,7 @@ smart.round <- function(x) {
   #   https://stackoverflow.com/questions/32544646/round-vector-of-numerics-to-integer-while-preserving-their-sum/32544987#32544987
   #   re-integer vector components
   y <- floor(x)
-  indices <- tail(order(x-y), round(sum(x)) - sum(y))
+  indices <- tail(order(x-y), round(sum(x, na.rm=TRUE)) - sum(y, na.rm=TRUE))
   y[indices] <- y[indices] + 1
   
   y
@@ -181,9 +181,10 @@ left_join(Df_county_all, Df_State_tot, by="Condition") %>%
     mutate(Sum_pop=sum(is.na(Deaths)*Total_pop, na.rm=TRUE),
            Sum=sum(Deaths, na.rm=TRUE),
            Max_pop=max(Total_pop[is.na(Deaths)]),
-           Impute_deaths=Deaths) %>% 
+           #Impute_deaths=Deaths
+           ) %>% 
   ungroup() %>% 
-  #   weight imputations by population
+  #   weight imputations by population, but squeezed into range 0-9
   mutate(wgt=9/((Tot_deaths-Sum)*Max_pop/Sum_pop)) %>% 
   mutate(Impute_deaths=ifelse(is.na(Deaths),
                               wgt*(Tot_deaths-Sum)*Total_pop/Sum_pop,
@@ -194,9 +195,10 @@ left_join(Df_county_all, Df_State_tot, by="Condition") %>%
                               Impute_deaths)) %>% 
   #   Now turn the weights into integers while preserving the sum
   group_by(Condition) %>% 
-    mutate(Impute_deaths[is.na(Deaths)]=smart.round(Impute_deaths[is.na(Deaths)])) %>% 
+    mutate(Impute_deaths=smart.round(Impute_deaths)) %>% 
     #   Now replace zeros with ones by stealing from larger numbers
-    mutate(Impute_deaths[is.na(Deaths)]=set_min_one(Impute_deaths[is.na(Deaths)]))
+    mutate(Impute_deaths=set_min_one(Impute_deaths)) %>% 
+    mutate(Impute_deaths=ifelse(is.na(Deaths), Impute_deaths, Deaths)) %>% 
   ungroup()
   
 
