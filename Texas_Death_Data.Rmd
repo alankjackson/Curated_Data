@@ -238,6 +238,29 @@ saveRDS(DF_Impute_Deaths_County,
 
 ```
 
+Let's take a look at the data just to make sure it is okay
+
+```{r data check 1}
+
+DF_Impute_Deaths_County %>% 
+  filter(Condition=="Emphysema") %>% 
+  ggplot(aes(y=County, x=Impute_deaths)) + 
+  geom_col()
+  
+DF_Impute_Deaths_County %>% 
+  filter(Condition=="Emphysema") %>% 
+  mutate(Death_per_cap=1.e5*Impute_deaths/County_pop) %>% 
+  filter(Death_per_cap>50,
+         Impute_deaths>5) %>% 
+  mutate(sigma=1.e5*((Impute_deaths+3)/County_pop - Impute_deaths/County_pop)) %>% 
+  ggplot(aes(y=reorder(County, Death_per_cap), x=Death_per_cap)) + 
+  geom_col() + 
+  geom_errorbar(aes(xmin=Death_per_cap-sigma, xmax=Death_per_cap+sigma))
+
+
+```
+
+
 ```{r test}
 
 foo <- DF_Impute_Deaths_County[DF_Impute_Deaths_County$Condition=="Accidental Discharge of Firearms",]
