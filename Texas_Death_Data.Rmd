@@ -148,8 +148,11 @@ smart.round <- function(x) {
   #   https://stackoverflow.com/questions/32544646/round-vector-of-numerics-to-integer-while-preserving-their-sum/32544987#32544987
   #   re-integer vector components
   y <- floor(x)
-  indices <- tail(order(x-y), round(sum(x, na.rm=TRUE)) - sum(y, na.rm=TRUE))
-  y[indices] <- y[indices] + 1
+  xx <- x[!is.na(x)]
+  yy <- y[!is.na(y)]
+  indices <- tail(order(xx-yy), round(sum(xx)) - sum(yy))
+  yy[indices] <- yy[indices] + 1
+  y[!is.na(y)] <-  yy
   
   y
 }
@@ -158,18 +161,39 @@ set_min_one <- function(x){
   #   Take a vector of integer components that range from 0 up, and 
   #   steal from the larger values to set all the zeros to one. Used
   #   for imputing number of deaths.
-  while((z=sum(x==0))>0){
-    twoplus <- min(sum(x>1), z)
+  xx <- x[!is.na(x)]
+  while((z=sum(xx==0))>0){
+    twoplus <- min(sum(xx>1), z)
     if (twoplus==0){# something bad happened
       print("Too many zeros - something bad happened")
-      print(x)
+      print(xx)
       break
     }
-    i_sub <- tail(order(x), twoplus)
-    i_add <- head(order(x), twoplus)
-    x[i_sub] <- x[i_sub] - 1
-    x[i_add] <- x[i_add] + 1
+    i_sub <- tail(order(xx), twoplus)
+    i_add <- head(order(xx), twoplus)
+    xx[i_sub] <- xx[i_sub] - 1
+    xx[i_add] <- xx[i_add] + 1
   }
+  #   Now steal from the larger values to push them down to 9, and
+  #   redistribute those numbers to the smaller values.
+  
+  redist <- sum(pmax(0,xx-9)) # amount to redistribute
+  # Set values >9 to 9
+  xx <- pmin(9, xx)
+  i <- 1
+  while(redist>0) {
+    #  Add 1 to a value, biased towards values that are already larger
+    if ((runif(1,min=1, max=9) < xx[i]) &
+        xx[i]<9) {
+      xx[i] <- xx[i] + 1
+      redist <- redist - 1
+    }
+    i <- (i+1) %% length(xx) + 1
+  }
+  
+  #   Re-merge original and imputed values
+  x[!is.na(x)] <-  xx
+  
   x
 }
 
@@ -179,33 +203,55 @@ left_join(Df_county_all, Df_State_tot, by="Condition") %>%
   select(-County.y) %>% 
   group_by(Condition) %>% 
     mutate(Sum_pop=sum(is.na(Deaths)*Total_pop, na.rm=TRUE),
-           Sum=sum(Deaths, na.rm=TRUE),
+           Sum_known=sum(Deaths, na.rm=TRUE),
            Max_pop=max(Total_pop[is.na(Deaths)]),
-           #Impute_deaths=Deaths
            ) %>% 
   ungroup() %>% 
-  #   weight imputations by population, but squeezed into range 0-9
-  mutate(wgt=9/((Tot_deaths-Sum)*Max_pop/Sum_pop)) %>% 
+  # First impute based on relative county population
   mutate(Impute_deaths=ifelse(is.na(Deaths),
-                              wgt*(Tot_deaths-Sum)*Total_pop/Sum_pop,
+                              (Tot_deaths-Sum_known)*Total_pop/Sum_pop,
                                Deaths)) %>% 
-  #   Assume any remaining NA's are such rare things that replacing with 1 is good
+  #   Assume any remaining NA's are such rare things that replacing with 1 
+  #   is good. These are values where the state total is < 10.
   mutate(Impute_deaths=ifelse(is.na(Impute_deaths),
                               1,
                               Impute_deaths)) %>% 
   #   Now turn the weights into integers while preserving the sum
   group_by(Condition) %>% 
+    mutate(Impute_deaths=ifelse(is.na(Deaths),
+                                Impute_deaths,
+                                NA)) %>% 
     mutate(Impute_deaths=smart.round(Impute_deaths)) %>% 
     #   Now replace zeros with ones by stealing from larger numbers
+    #   Until the largest imputed number is 9
     mutate(Impute_deaths=set_min_one(Impute_deaths)) %>% 
+    #   Add Deaths that are not imputed back into imputed deaths column
     mutate(Impute_deaths=ifelse(is.na(Deaths), Impute_deaths, Deaths)) %>% 
-  ungroup()
+  ungroup() %>% 
+  select(County.x, Condition, Deaths, FIPS, Total_pop, Impute_deaths) %>% 
+  rename(County=County.x, County_pop=Total_pop)
   
-
+saveRDS(DF_Impute_Deaths_County, 
+        paste0(path, "Imputed_Deaths_by_County_Total.rds"))
 
 
 
 ```
+
+```{r test}
+
+foo <- DF_Impute_Deaths_County[DF_Impute_Deaths_County$Condition=="Accidental Discharge of Firearms",]
+
+sum(foo$Impute_deaths, na.rm=TRUE)
+
+sum(foo$Deaths, na.rm=TRUE)
+sum(is.na(foo$Deaths))
+
+
+```
+
+
+
 
 
 ```{r Keep as examples}
