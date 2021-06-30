@@ -50,7 +50,7 @@ To begin, we will read in and examine the full state totals.
 
 ###########     Read in totals for all years and the state
 
-Df_State_tot <- read.delim(paste0(path, "State_allyears_deaths.csv"),
+Df_State_tot <- read.delim(paste0(path, "Input_data/State_allyears_deaths.csv"),
                    sep="\t",
                    fileEncoding="UTF-16LE",
                    na.strings="---",
@@ -70,7 +70,7 @@ Df_State_tot <- read.delim(paste0(path, "State_allyears_deaths.csv"),
 
 Df_State_yr_tot <- 
   data.frame(year=2006:2017) %>% 
-  mutate(filename=paste0(path, "State_", year, "_deaths.csv")) %>% 
+  mutate(filename=paste0(path, "Input_data/State_", year, "_deaths.csv")) %>% 
   mutate(file_contents=map(filename,
     ~ read.delim(.,
                    sep="\t",
@@ -117,7 +117,7 @@ Now county totals for all years
 
 ###########     Read in By County
 
-Df_county_all <- read.delim(paste0(path, "County_allyears_deaths.csv"),
+Df_county_all <- read.delim(paste0(path, "Input_data/County_allyears_deaths.csv"),
                    sep="\t",
                    fileEncoding="UTF-16LE",
                    na.strings="---",
@@ -257,23 +257,59 @@ DF_Impute_Deaths_County %>%
   geom_col() + 
   geom_errorbar(aes(xmin=Death_per_cap-sigma, xmax=Death_per_cap+sigma))
 
+DF_Impute_Deaths_County %>% 
+  filter(is.na(Deaths)) %>% # only imputed values
+  ggplot(aes(x=Impute_deaths)) +
+  geom_bar()
+
+DF_Impute_Deaths_County %>% 
+  filter(is.na(Deaths)) %>% # only imputed values
+  mutate(Impute_per_cap=1.e5*Impute_deaths/County_pop) %>% 
+  ggplot(aes(x=Impute_per_cap)) +
+  geom_histogram()
+
+DF_Impute_Deaths_County %>% 
+  filter(!is.na(Deaths)) %>% # only known values
+  mutate(Impute_per_cap=1.e5*Impute_deaths/County_pop) %>% 
+  ggplot(aes(x=Impute_per_cap)) +
+  geom_histogram()
 
 ```
 
+Now read in county data by year and condition
 
-```{r test}
+```{r county by year}
 
-foo <- DF_Impute_Deaths_County[DF_Impute_Deaths_County$Condition=="Accidental Discharge of Firearms",]
+Df_County_yr <- 
+  data.frame(year=2006:2017) %>% 
+  mutate(filename=paste0(path, "Input_data/Deaths_by_county_", year,".csv")) %>% 
+  mutate(file_contents=map(filename,
+    ~ read.delim(.,
+                   sep="\t",
+                   fileEncoding="UTF-16LE",
+                   na.strings="---",
+                   skip=1,
+                   header=FALSE,
+                   colClasses="character",
+                   stringsAsFactors = FALSE
+                   ))) %>% 
+  select(-filename) %>% 
+  #mutate(Year=year) %>% 
+    unnest() %>% 
+  rename("County"=V1, "Condition"=V2, "Deaths"=V3) %>%  
+  #   F&^%ers put commas in the numbers
+  mutate_at(vars(contains("Deaths")), 
+         funs(str_remove_all(., ","))) %>% 
+  #   Make numbers numbers
+  type_convert(col_types = paste0("icc", strrep("i",1)))
 
-sum(foo$Impute_deaths, na.rm=TRUE)
 
-sum(foo$Deaths, na.rm=TRUE)
-sum(is.na(foo$Deaths))
+
+
+
 
 
 ```
-
-
 
 
 
