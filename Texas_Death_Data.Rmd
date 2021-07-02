@@ -188,7 +188,7 @@ set_min_one <- function(x){
       xx[i] <- xx[i] + 1
       redist <- redist - 1
     }
-    i <- (i+1) %% length(xx) + 1
+    i <- ((i) %% length(xx)) + 1
   }
   
   #   Re-merge original and imputed values
@@ -294,7 +294,6 @@ Df_County_yr <-
                    stringsAsFactors = FALSE
                    ))) %>% 
   select(-filename) %>% 
-  #mutate(Year=year) %>% 
     unnest() %>% 
   rename("County"=V1, "Condition"=V2, "Deaths"=V3) %>%  
   #   F&^%ers put commas in the numbers
@@ -303,6 +302,82 @@ Df_County_yr <-
   #   Make numbers numbers
   type_convert(col_types = paste0("icc", strrep("i",1)))
 
+Df_County_yr <- Df_County_yr %>% 
+  #   add minimum that sum over years must be
+  group_by(County, Condition) %>% 
+    mutate(Min_sum_deaths=sum(is.na(Deaths))) %>% 
+  ungroup()
+
+####   Let's backtrack a bit and fix the DF_Impute_Deaths_County
+####   by applying he minimum values we just calculated to it.
+
+foo <- Df_County_yr %>% 
+  group_by(County, Condition) %>% 
+    summarize(Min_sum_deaths=sum(is.na(Deaths)))  
+  
+DF_Impute_Deaths_County <- left_join(DF_Impute_Deaths_County, 
+                                     foo, 
+                                     by=c("County", "Condition"))
+Fix_minimum <- function(df){
+    x <- df[is.na(df$Deaths),] # pick out only rows to be updated
+      # add row number so order can be recovered
+    x <- x %>% mutate(ID=row_number()) %>% 
+      # order by adjustment so we'll fix it in one pass
+      arrange(adjust)
+  print(paste("------", df[1,]$Condition))  
+  #   If all values are NA, treat as special
+  if (sum(is.na(x$Deaths))==nrow(x)) {
+    print("I'm special")
+    x$Impute_deaths <- x$Min_sum_deaths
+    x <- x %>% arrange(ID) %>% 
+      select(-ID)
+    df[is.na(df$Deaths),] <- x # add back only rows updated
+    return(df$Impute_deaths) # return for this case
+  }
+  redist <- -sum(pmin(0,x$adjust)) # amount to redistribute (neg values only)
+  i <- 1
+  while(redist>0) {
+    #print(paste("-2-", i, redist))
+    #  Add adjust to a value, or if >=0, steal from redist
+    if (x$adjust[i]<0) {
+    #print("-3-")
+      x$Impute_deaths[i] <- x$Impute_deaths[i] - x$adjust[i]
+      x$adjust[i] <- 0
+    } else {
+   #print("-4-")
+      if (x$Impute_deaths[i]>x$Min_sum_deaths[i]){
+    #print(paste("-5-", i, redist))
+        x$Impute_deaths[i] <- x$Impute_deaths[i]-1
+        redist <- redist - 1
+        }
+    }
+    i <- ((i) %% nrow(x)) + 1
+  }
+  x <- x %>% arrange(ID) %>% 
+    select(-ID)
+  df[is.na(df$Deaths),] <- x # add back only rows updated
+  df$Impute_deaths
+}
+
+foo <- DF_Impute_Deaths_County %>% 
+  mutate(adjust=Impute_deaths-Min_sum_deaths) %>% 
+  group_by(Condition) %>% 
+    mutate(New_impute=Fix_minimum(tibble(Condition,
+                                         Deaths, 
+                                         Impute_deaths, 
+                                         Min_sum_deaths, 
+                                         adjust))) %>% 
+  ungroup()
+
+###############################   stopped here
+#   Add in the previously imputed values of deaths per county per condition
+#   summed over the year range
+
+Df_County_yr_imputed <- left_join(Df_County_yr, 
+                                  DF_Impute_Deaths_County,
+                                  by=c("County", "Condition")) %>% 
+  select(-Deaths.y) %>% 
+  rename(Deaths=Deaths.x, Imputed_deaths_sum=Impute_deaths)
 
 
 
