@@ -367,8 +367,13 @@ foo <- DF_Impute_Deaths_County %>%
                                          Impute_deaths, 
                                          Min_sum_deaths, 
                                          adjust))) %>% 
-  ungroup()
+  ungroup() %>% 
+  select(County, Condition, Deaths, FIPS, County_pop, Impute_deaths=New_impute)
 
+saveRDS(foo, 
+        paste0(path, "Imputed_Deaths_by_County_Total.rds"))
+
+DF_Impute_Deaths_County <- foo
 ###############################   stopped here
 #   Add in the previously imputed values of deaths per county per condition
 #   summed over the year range
@@ -380,6 +385,8 @@ Df_County_yr_imputed <- left_join(Df_County_yr,
   rename(Deaths=Deaths.x, Imputed_deaths_sum=Impute_deaths)
 
 
+saveRDS(Df_County_yr_imputed, 
+        paste0(path, "Imputed_Deaths_by_County_by_year.rds"))
 
 
 
