@@ -57,8 +57,11 @@ Retrieved: 24 Jun 2021
 Imputed_Deaths_by_County_Total.rds : County, Cause of death, # deaths, 
                                      imputed # deaths, county population
                               
-                              
-                              
+          Years from 2006-2017  
+          
+Imputed_Deaths_by_County_by_year.rds : County, Cause of death, # deaths,
+                                     imputed # deaths, county population, year
+                            
                               
                               
 
