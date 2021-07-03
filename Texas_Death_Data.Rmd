@@ -231,8 +231,8 @@ left_join(Df_county_all, Df_State_tot, by="Condition") %>%
   select(County.x, Condition, Deaths, FIPS, Total_pop, Impute_deaths) %>% 
   rename(County=County.x, County_pop=Total_pop)
   
-saveRDS(DF_Impute_Deaths_County, 
-        paste0(path, "Imputed_Deaths_by_County_Total.rds"))
+#saveRDS(DF_Impute_Deaths_County, 
+#        paste0(path, "Imputed_Deaths_by_County_Total.rds"))
 
 
 
