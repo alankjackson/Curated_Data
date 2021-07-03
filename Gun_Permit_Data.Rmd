@@ -1,0 +1,303 @@
+---
+title: "Gun Permit Data"
+author: "Alan Jackson"
+date: "7/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tabulizer)
+
+options(stringsAsFactors = FALSE)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Here be files by zipcode, with varying names...
+
+http://www.dps.texas.gov/RSD/LTC/Reports/2014Calendar/byZipcode/17LicenseApplicationsIssued.pdf
+
+http://www.dps.texas.gov/rsd/LTC/reports/2010Calendar/ByZipCode/CY10ZipCodeLicApplIssued.pdf
+
+http://www.dps.texas.gov/rsd/LTC/reports/2009Calendar/ByZipCode/CY09ZipLicAppsIssued.pdf
+
+```{r read by zip, eval=FALSE}
+#   Download all the pdfs
+
+output_folder <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits"
+for (year in 1997:2017) {
+  if (year>2010) {
+  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byZipcode/17LicenseApplicationsIssued.pdf")
+  }
+  else if (year == 2010) {
+  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byZipcode/CY",substr(year,3,4),"ZipCodeLicApplIssued.pdf")
+  }
+  else {
+  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byZipcode/CY",substr(year,3,4),"ZipLicAppsIssued.pdf")
+  }
+  outfile <- paste0("LicenseApplicationsIssued_by_Zip",year,".pdf")
+  m <- download(url, output_folder, outfile) 
+  print(m)
+}
+
+```
+
+## Here be files by county, with varying names...
+
+http://www.dps.texas.gov/RSD/LTC/Reports/2014Calendar/byCounty/25LicenseApplicationsIssued.pdf
+
+http://www.dps.texas.gov/rsd/LTC/reports/2010Calendar/ByCounty/CY10CountyLicApplIssued.pdf
+
+http://www.dps.texas.gov/rsd/LTC/reports/2009Calendar/ByCounty/CY09CountyLicAppsIssued.pdf
+
+```{r read by county, eval=FALSE}
+#   Download all the pdfs
+
+output_folder <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits"
+for (year in 1997:2017) {
+  if (year>2010) {
+  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byCounty/25LicenseApplicationsIssued.pdf")
+  }
+  else if (year == 2010) {
+  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byCounty/CY",substr(year,3,4),"CountyLicApplIssued.pdf")
+  }
+  else {
+  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byCounty/CY",substr(year,3,4),"CountyLicAppsIssued.pdf")
+  }
+  outfile <- paste0("LicenseApplicationsIssued_by_County",year,".pdf")
+  m <- download(url, output_folder, outfile) 
+  print(m)
+}
+
+```
+
+##  Parse the County PDF's
+
+Years 2011 and 2012 were stored as images and not text in the pdf's, so that will take more work.
+
+```{r parse county pdfs}
+
+parse_county <- function(path, year){
+  options(stringsAsFactors = FALSE)
+  
+  final <- data.frame(Year=character(),
+                      County=character(),
+                      Applicants=numeric(),
+                      Percent=numeric(),
+                      stringsAsFactors = FALSE)
+  
+  a <- extract_tables(path)
+  skip <- 2
+  if (year==2006|year==2007) {skip <- 3}
+  if (year==2014) {skip <- 4}
+  tnum <- 1:3  # table numbers to grab
+  if (year==2014) {tnum <- c(1,3,5)}
+  
+  for (i in tnum){
+    temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),1:3], stringsAsFactors = FALSE)
+    names(temp) <- c("County", "Applicants", "Percent")
+    temp <- cbind(Year=as.character(year), temp)
+    temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
+    temp$Percent <- as.numeric(gsub("%","",temp$Percent))
+    final <- bind_rows(final, temp)
+    
+    temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),4:6], stringsAsFactors = FALSE)
+    names(temp) <- c("County", "Applicants", "Percent")
+    temp <- cbind(Year=as.character(year), temp)
+    temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
+    temp$Percent <- as.numeric(gsub("%","",temp$Percent))
+    final <- bind_rows(final, temp)
+  }
+  if (year != 2014) {
+    temp <- as.data.frame(a[[4]][skip:nrow(a[[4]]),1:3], stringsAsFactors = FALSE)
+    names(temp) <- c("County", "Applicants", "Percent")
+    temp <- cbind(Year=as.character(year), temp)
+    temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
+    temp$Percent <- as.numeric(gsub("%","",temp$Percent))
+    final <- bind_rows(final, temp)
+  }
+  
+  return(final)
+}
+
+final <- data.frame(Year=character(),
+                    County=character(),
+                    Applicants=numeric(),
+                    Percent=numeric(),
+                    stringsAsFactors = FALSE)
+
+path <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/LicenseApplicationsIssued_by_County"
+for (year in c(1997:2010,2013:2017)) {
+  print(paste0("parse ",year))
+  a <- parse_county(paste0(path,year,".pdf"), year)
+  final <- bind_rows(final, a)
+}
+
+#   add in missing data for 2014 that didn't parse
+
+lost <- c("WILSON", "WINKLER", "WISE", "WOOD", "YOAKUM", "YOUNG", "ZAPATA", "ZAVALA", "[Out of State County]", "Total",
+  "719", "64", "909", "603", "52", "244", "60", "37", "2248", "246326",
+  "0.29", "0.03", "0.37", "0.24", "0.02", "0.10", "0.02", "0.02", "0.91", "100.00")
+lost <- cbind.data.frame(split(lost, rep(1:3, each=length(lost)/3)), stringsAsFactors=FALSE)
+names(lost) <- c("County", "Applicants", "Percent")
+lost$Applicants <- as.numeric(lost$Applicants)
+lost$Percent <- as.numeric(lost$Percent)
+
+lost <- cbind(Year="2014", lost)  
+
+final <- bind_rows(final, lost)
+
+#   add in data for 2011 and 2012 that was an image and had to be ocr'd in Google
+
+temp <- read.csv("~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/CountyPermits2011.csv")
+temp$Year <- as.character(temp$Year)
+final <- bind_rows(final, temp)
+
+temp <- read.csv("~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/CountyPermits2012.csv")
+temp$Year <- as.character(temp$Year)
+temp$Applicants <- as.numeric(temp$Applicants)
+final <- bind_rows(final, temp)
+
+#     enforce some consistency
+
+final$County <- str_replace(final$County, "\\[Out of State County\\]", "NONE")
+final$County <- str_replace(final$County, "\\[NONE\\]", "NONE")
+
+#     Save to a file
+
+saveRDS(final, file="~/Dropbox/Rprojects/WilsonCountyGunStudy/CountyPermitData.rds")
+
+```
+
+
+##   Do a little QC on the data
+
+```{r QC step}
+
+summary(final)
+
+final %>%
+  filter(Percent<25) %>%
+  filter(County!="Total") %>%
+  ggplot(aes(x=Applicants, y=Percent)) +
+  geom_point()
+
+#   make a rotated bar chart of applications by county
+final %>%
+  filter(County!="Total") %>%
+  ggplot(aes(x=County, y=Applicants)) +
+  geom_col() +
+  coord_flip()
+
+```
+
+##    Parse zipcode gun permit files
+
+```{r parse zipcode files}
+
+parse_zip <- function(path, year){
+  options(stringsAsFactors = FALSE)
+  
+  final <- data.frame(Year=character(),
+                      Zipcode=character(),
+                      Applicants=numeric(),
+                      stringsAsFactors = FALSE)
+  
+  a <- extract_tables(path)
+  skip <- 3
+  tnum <- 1:length(a)  # table numbers to grab
+  
+  for (i in tnum){
+    print(paste("----", i, "-----"))
+    if (dim(a[[i]])[1] < 40 && year == 2012) {next}
+    width <- dim(a[[i]])[2]
+    temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),1:width], stringsAsFactors = FALSE)
+    # split table vertically
+    if (width==8){
+      temp <- temp %>% bind_rows(rename(select(.,V3,V4), V1=V3, V2=V4), rename(select(.,V5,V6),V1=V5, V2=V6),rename(select(.,V7,V8), V1=V7, V2=V8))%>%
+      select(V1, V2)
+  }
+  else if (width==6){
+      temp <- temp %>% bind_rows(rename(select(.,V3,V4), V1=V3, V2=V4), rename(select(.,V5,V6),V1=V5, V2=V6))%>%
+      select(V1, V2)
+  }
+  else if (width == 4) {
+      temp <- temp %>% bind_rows(rename(select(.,V3,V4), V1=V3, V2=V4))%>%
+      select(V1, V2)
+  }
+    
+    names(temp) <- c("Zipcode", "Applicants")
+    temp <- cbind(Year=as.character(year), temp)
+    temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
+    final <- bind_rows(final, temp) %>%
+      na.omit()
+    
+    
+  }
+  
+  return(final)
+} ####   end of function
+
+finalzip <- data.frame(Year=character(),
+                    Zipcode=character(),
+                    Applicants=numeric(),
+                    stringsAsFactors = FALSE)
+
+path <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/LicenseApplicationsIssued_by_Zip"
+for (year in c(1997:2010,2012:2017)) {
+  print(paste0("parse ",year))
+  a <- parse_zip(paste0(path,year,".pdf"), year)
+  finalzip <- bind_rows(finalzip, a)
+}
+#   drop rows with zipcodes not in Texas
+finalzip$Zipcode <- as.numeric(finalzip$Zipcode)
+finalzip <- finalzip %>% 
+  na.omit() %>%
+  filter(Zipcode==73301 | 
+         between(Zipcode,75001,75501) |
+         between(Zipcode,75503,79999))
+  
+
+#   Pick up tables that extract_tables failed to find
+
+lost <- c("79905", "79906", "79907", "79908", "79912", "79915", "79916", "79922", "79924", "79925", "79927", "79930", "79932", "79934", "79935", "79936", "79937", "79938",
+  "6", "2", "14", "1", "103", "15", "4", "27", "80", "49", "12", "19", "23", "10", "38", "83", "1", "15")
+lost <- cbind.data.frame(split(lost, rep(1:2, each=length(lost)/2)), stringsAsFactors=FALSE)
+names(lost) <- c("Zipcode", "Applicants")
+lost$Applicants <- as.numeric(lost$Applicants)
+lost$Zipcode <- as.numeric(lost$Zipcode)
+
+lost <- cbind(Year="1997", lost)  
+
+finalzip <- bind_rows(finalzip, lost)
+
+#   add in data for 2011 and 2012 that was an image and had to be ocr'd with ocrmypdf LicenseApplicationsIssued_by_Zip2011.pdf temp.pdf
+
+
+temp <- read.csv("~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/ZipPermits2011.csv", colClasses=c("character", "numeric", "numeric"))
+temp$Year <- as.character(temp$Year)
+finalzip <- bind_rows(finalzip, temp)
+
+#     Save to a file
+
+saveRDS(finalzip, file="~/Dropbox/Rprojects/WilsonCountyGunStudy/ZipPermitData.rds")
+
+
+```
+
+	
+##   Do some somple QC on the zipcode data
+
+```{r qc zipcode data}
+
+finalzip %>%
+  filter(Year != "1997")%>% # low number for 1st year
+  filter(Year != "1999")%>% # low numbers for unknown reason
+  group_by(Zipcode) %>%
+  summarize(dev=sd(Applicants), avg=mean(Applicants), minimum=min(Applicants), maximum=max(Applicants)) %>%
+  arrange(desc(avg))
+
+
+```
+
