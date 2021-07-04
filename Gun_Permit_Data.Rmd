@@ -8,6 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(tabulizer)
+library(textreadr)
+
+output_folder <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Gun_Permits/"
 
 options(stringsAsFactors = FALSE)
 
@@ -16,26 +19,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Here be files by zipcode, with varying names...
 
-http://www.dps.texas.gov/RSD/LTC/Reports/2014Calendar/byZipcode/17LicenseApplicationsIssued.pdf
+https://www.dps.texas.gov/sites/default/files/documents/rsd/ltc/reports/2016calendar/byzipcode/17licenseapplicationsissued.pdf
 
-http://www.dps.texas.gov/rsd/LTC/reports/2010Calendar/ByZipCode/CY10ZipCodeLicApplIssued.pdf
+https://www.dps.texas.gov/sites/default/files/documents/rsd/ltc/reports/2020calendar/byzipcode/17licenseapplicationsissued.pdf
 
-http://www.dps.texas.gov/rsd/LTC/reports/2009Calendar/ByZipCode/CY09ZipLicAppsIssued.pdf
+Earlier files already downloaded a few years ago.
 
 ```{r read by zip, eval=FALSE}
 #   Download all the pdfs
 
-output_folder <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits"
-for (year in 1997:2017) {
-  if (year>2010) {
-  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byZipcode/17LicenseApplicationsIssued.pdf")
-  }
-  else if (year == 2010) {
-  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byZipcode/CY",substr(year,3,4),"ZipCodeLicApplIssued.pdf")
-  }
-  else {
-  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byZipcode/CY",substr(year,3,4),"ZipLicAppsIssued.pdf")
-  }
+###output_folder <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits"
+for (year in 2017:2020) {
+  url <- paste0("http://www.dps.texas.gov/sites/default/files/documents/rsd/ltc/reports/",year,"calendar/byzipcode/17licenseapplicationsissued.pdf")
+
   outfile <- paste0("LicenseApplicationsIssued_by_Zip",year,".pdf")
   m <- download(url, output_folder, outfile) 
   print(m)
@@ -45,26 +41,13 @@ for (year in 1997:2017) {
 
 ## Here be files by county, with varying names...
 
-http://www.dps.texas.gov/RSD/LTC/Reports/2014Calendar/byCounty/25LicenseApplicationsIssued.pdf
-
-http://www.dps.texas.gov/rsd/LTC/reports/2010Calendar/ByCounty/CY10CountyLicApplIssued.pdf
-
-http://www.dps.texas.gov/rsd/LTC/reports/2009Calendar/ByCounty/CY09CountyLicAppsIssued.pdf
+https://www.dps.texas.gov/sites/default/files/documents/rsd/ltc/reports/2020fiscal/bycounty/25licenseapplicationsissued.pdf
 
 ```{r read by county, eval=FALSE}
 #   Download all the pdfs
 
-output_folder <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits"
-for (year in 1997:2017) {
-  if (year>2010) {
-  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byCounty/25LicenseApplicationsIssued.pdf")
-  }
-  else if (year == 2010) {
-  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byCounty/CY",substr(year,3,4),"CountyLicApplIssued.pdf")
-  }
-  else {
-  url <- paste0("http://www.dps.texas.gov/RSD/LTC/Reports/",year,"Calendar/byCounty/CY",substr(year,3,4),"CountyLicAppsIssued.pdf")
-  }
+for (year in 2017:2020) {
+  url <- paste0("http://www.dps.texas.gov/sites/default/files/documents/rsd/ltc/reports/",year,"calendar/bycounty/25licenseapplicationsissued.pdf")
   outfile <- paste0("LicenseApplicationsIssued_by_County",year,".pdf")
   m <- download(url, output_folder, outfile) 
   print(m)
@@ -74,7 +57,6 @@ for (year in 1997:2017) {
 
 ##  Parse the County PDF's
 
-Years 2011 and 2012 were stored as images and not text in the pdf's, so that will take more work.
 
 ```{r parse county pdfs}
 
@@ -88,11 +70,8 @@ parse_county <- function(path, year){
                       stringsAsFactors = FALSE)
   
   a <- extract_tables(path)
-  skip <- 2
-  if (year==2006|year==2007) {skip <- 3}
-  if (year==2014) {skip <- 4}
+  skip <- 3
   tnum <- 1:3  # table numbers to grab
-  if (year==2014) {tnum <- c(1,3,5)}
   
   for (i in tnum){
     temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),1:3], stringsAsFactors = FALSE)
@@ -109,17 +88,13 @@ parse_county <- function(path, year){
     temp$Percent <- as.numeric(gsub("%","",temp$Percent))
     final <- bind_rows(final, temp)
   }
-  if (year != 2014) {
-    temp <- as.data.frame(a[[4]][skip:nrow(a[[4]]),1:3], stringsAsFactors = FALSE)
-    names(temp) <- c("County", "Applicants", "Percent")
-    temp <- cbind(Year=as.character(year), temp)
-    temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
-    temp$Percent <- as.numeric(gsub("%","",temp$Percent))
-    final <- bind_rows(final, temp)
-  }
-  
   return(final)
 }
+
+#   Read in manually constructed csv file and append
+
+
+
 
 final <- data.frame(Year=character(),
                     County=character(),
@@ -127,37 +102,13 @@ final <- data.frame(Year=character(),
                     Percent=numeric(),
                     stringsAsFactors = FALSE)
 
-path <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/LicenseApplicationsIssued_by_County"
-for (year in c(1997:2010,2013:2017)) {
+path <- paste0(output_folder,"LicenseApplicationsIssued_by_County")
+for (year in c(2017:2020)) {
   print(paste0("parse ",year))
   a <- parse_county(paste0(path,year,".pdf"), year)
   final <- bind_rows(final, a)
 }
 
-#   add in missing data for 2014 that didn't parse
-
-lost <- c("WILSON", "WINKLER", "WISE", "WOOD", "YOAKUM", "YOUNG", "ZAPATA", "ZAVALA", "[Out of State County]", "Total",
-  "719", "64", "909", "603", "52", "244", "60", "37", "2248", "246326",
-  "0.29", "0.03", "0.37", "0.24", "0.02", "0.10", "0.02", "0.02", "0.91", "100.00")
-lost <- cbind.data.frame(split(lost, rep(1:3, each=length(lost)/3)), stringsAsFactors=FALSE)
-names(lost) <- c("County", "Applicants", "Percent")
-lost$Applicants <- as.numeric(lost$Applicants)
-lost$Percent <- as.numeric(lost$Percent)
-
-lost <- cbind(Year="2014", lost)  
-
-final <- bind_rows(final, lost)
-
-#   add in data for 2011 and 2012 that was an image and had to be ocr'd in Google
-
-temp <- read.csv("~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/CountyPermits2011.csv")
-temp$Year <- as.character(temp$Year)
-final <- bind_rows(final, temp)
-
-temp <- read.csv("~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/CountyPermits2012.csv")
-temp$Year <- as.character(temp$Year)
-temp$Applicants <- as.numeric(temp$Applicants)
-final <- bind_rows(final, temp)
 
 #     enforce some consistency
 
@@ -166,7 +117,7 @@ final$County <- str_replace(final$County, "\\[NONE\\]", "NONE")
 
 #     Save to a file
 
-saveRDS(final, file="~/Dropbox/Rprojects/WilsonCountyGunStudy/CountyPermitData.rds")
+#saveRDS(final, file="~/Dropbox/Rprojects/WilsonCountyGunStudy/CountyPermitData.rds")
 
 ```
 
