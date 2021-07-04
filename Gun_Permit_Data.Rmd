@@ -12,6 +12,10 @@ library(textreadr)
 
 output_folder <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Gun_Permits/"
 
+#   read in standard county name file
+
+Counties <- readRDS("/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Counties/County_Names.rds")
+
 options(stringsAsFactors = FALSE)
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -97,7 +101,6 @@ parse_county <- function(path, year){
   }
   return(final)
 }
-######################   stopped here
 
 final <- data.frame(Year=character(),
                     County=character(),
@@ -125,6 +128,13 @@ final <- bind_rows(final, foo)
 
 final$County <- str_replace(final$County, "\\[Out of State County\\]", "NONE")
 final$County <- str_replace(final$County, "\\[NONE\\]", "NONE")
+
+#   Clean up the county names 
+
+final <- final %>% 
+  mutate(County=str_to_title(County))
+
+final[final$County=="Dewitt",]$County <- "DeWitt"  # yeah, why do they spell it that way?
 
 #     Save to a file
 
