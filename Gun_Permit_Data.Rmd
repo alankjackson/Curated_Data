@@ -57,6 +57,10 @@ for (year in 2017:2020) {
 
 ##  Parse the County PDF's
 
+These are for 2017-2020, which I did not already have done. The third page
+of the 2020 pdf refuses to parse nicely, so I extracted the values using
+Acrobat, and manually created an approrpiate CSV file from them. So it goes.
+
 
 ```{r parse county pdfs}
 
@@ -71,7 +75,8 @@ parse_county <- function(path, year){
   
   a <- extract_tables(path)
   skip <- 3
-  tnum <- 1:3  # table numbers to grab
+  tnum <- 1:4  # table numbers to grab
+  if (year=="2020") {tnum <- 1:2} # third page a problem
   
   for (i in tnum){
     temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),1:3], stringsAsFactors = FALSE)
@@ -81,20 +86,18 @@ parse_county <- function(path, year){
     temp$Percent <- as.numeric(gsub("%","",temp$Percent))
     final <- bind_rows(final, temp)
     
-    temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),4:6], stringsAsFactors = FALSE)
-    names(temp) <- c("County", "Applicants", "Percent")
-    temp <- cbind(Year=as.character(year), temp)
-    temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
-    temp$Percent <- as.numeric(gsub("%","",temp$Percent))
-    final <- bind_rows(final, temp)
+    if (i <4){
+      temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),4:6], stringsAsFactors = FALSE)
+      names(temp) <- c("County", "Applicants", "Percent")
+      temp <- cbind(Year=as.character(year), temp)
+      temp$Applicants <- as.numeric(gsub(",","",temp$Applicants))
+      temp$Percent <- as.numeric(gsub("%","",temp$Percent))
+      final <- bind_rows(final, temp)
+    }
   }
   return(final)
 }
-
-#   Read in manually constructed csv file and append
-
-
-
+######################   stopped here
 
 final <- data.frame(Year=character(),
                     County=character(),
@@ -109,6 +112,14 @@ for (year in c(2017:2020)) {
   final <- bind_rows(final, a)
 }
 
+#   Read in manually constructed csv file and append
+
+foo <- read_csv(paste0(output_folder, "County2020_page_3.txt"), 
+                col_names=FALSE) %>% 
+  rename(County=X1, Applicants=X2, Percent=X3) %>% 
+  add_column(Year="2020", .before=1)
+
+final <- bind_rows(final, foo)
 
 #     enforce some consistency
 
@@ -117,7 +128,8 @@ final$County <- str_replace(final$County, "\\[NONE\\]", "NONE")
 
 #     Save to a file
 
-#saveRDS(final, file="~/Dropbox/Rprojects/WilsonCountyGunStudy/CountyPermitData.rds")
+saveRDS(final, paste0(output_folder, "Licenses_by_County_2017to2020.rds"))
+
 
 ```
 
