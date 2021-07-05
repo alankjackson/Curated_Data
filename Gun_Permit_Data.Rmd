@@ -288,9 +288,6 @@ All_zip <- bind_rows(Old_zip, New_zip)
 
 saveRDS(All_zip, paste0(output_folder, "Licenses_by_Zip_1997to2020.rds"))
 
-
-
-
 ```
 
 
