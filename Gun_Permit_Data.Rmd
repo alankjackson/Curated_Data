@@ -184,6 +184,7 @@ parse_zip <- function(path, year){
   for (i in tnum){
     print(paste("----", i, "-----"))
     if (dim(a[[i]])[1] < 40 && year == 2012) {next}
+    if (i%%2==1 && year == 2018) {next}
     width <- dim(a[[i]])[2]
     temp <- as.data.frame(a[[i]][skip:nrow(a[[i]]),1:width], stringsAsFactors = FALSE)
     # split table vertically
@@ -217,13 +218,15 @@ finalzip <- data.frame(Year=character(),
                     Applicants=numeric(),
                     stringsAsFactors = FALSE)
 
-path <- "~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/LicenseApplicationsIssued_by_Zip"
-for (year in c(1997:2010,2012:2017)) {
+path <- paste0(output_folder,"LicenseApplicationsIssued_by_Zip")
+for (year in c(2017:2020)) {
   print(paste0("parse ",year))
   a <- parse_zip(paste0(path,year,".pdf"), year)
   finalzip <- bind_rows(finalzip, a)
 }
+
 #   drop rows with zipcodes not in Texas
+
 finalzip$Zipcode <- as.numeric(finalzip$Zipcode)
 finalzip <- finalzip %>% 
   na.omit() %>%
@@ -232,30 +235,9 @@ finalzip <- finalzip %>%
          between(Zipcode,75503,79999))
   
 
-#   Pick up tables that extract_tables failed to find
-
-lost <- c("79905", "79906", "79907", "79908", "79912", "79915", "79916", "79922", "79924", "79925", "79927", "79930", "79932", "79934", "79935", "79936", "79937", "79938",
-  "6", "2", "14", "1", "103", "15", "4", "27", "80", "49", "12", "19", "23", "10", "38", "83", "1", "15")
-lost <- cbind.data.frame(split(lost, rep(1:2, each=length(lost)/2)), stringsAsFactors=FALSE)
-names(lost) <- c("Zipcode", "Applicants")
-lost$Applicants <- as.numeric(lost$Applicants)
-lost$Zipcode <- as.numeric(lost$Zipcode)
-
-lost <- cbind(Year="1997", lost)  
-
-finalzip <- bind_rows(finalzip, lost)
-
-#   add in data for 2011 and 2012 that was an image and had to be ocr'd with ocrmypdf LicenseApplicationsIssued_by_Zip2011.pdf temp.pdf
-
-
-temp <- read.csv("~/Dropbox/Rprojects/WilsonCountyGunStudy/GunPermits/ZipPermits2011.csv", colClasses=c("character", "numeric", "numeric"))
-temp$Year <- as.character(temp$Year)
-finalzip <- bind_rows(finalzip, temp)
-
 #     Save to a file
 
-saveRDS(finalzip, file="~/Dropbox/Rprojects/WilsonCountyGunStudy/ZipPermitData.rds")
-
+saveRDS(final, paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
 
 ```
 
