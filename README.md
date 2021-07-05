@@ -62,7 +62,17 @@ Imputed_Deaths_by_County_Total.rds : County, Cause of death, # deaths,
 Imputed_Deaths_by_County_by_year.rds : County, Cause of death, # deaths,
                                      imputed # deaths, county population, year
                             
-                              
+----------------
+Texas Department of Public Safety
+
+https://www.dps.texas.gov/
+
+Handgun Licensing data by year, county, and zipcode, from 1997 to 2020.
+
+Retrieved in 2016 and June 30, 2021
+
+Licenses_by_County_1997to2020.rds : Year, County, # applicants, %
+Licenses_by_Zip_1997to2020.rds : Year, Zipcode, # applicants, %
                               
 
 
