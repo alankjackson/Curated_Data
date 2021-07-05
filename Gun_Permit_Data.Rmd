@@ -237,7 +237,7 @@ finalzip <- finalzip %>%
 
 #     Save to a file
 
-saveRDS(final, paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
+saveRDS(finalzip, paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
 
 ```
 
@@ -255,4 +255,50 @@ finalzip %>%
 
 
 ```
+
+
+Now read in the old files and combine with the new files.
+
+```{r combine}
+
+oldpath <- "/home/ajackson/Dropbox/Rprojects/WilsonCountyGunStudy/"
+
+####     County data
+
+Old_county <- readRDS(paste0(oldpath,"CountyPermitData.rds"))
+New_county <- readRDS(paste0(output_folder, "Licenses_by_County_2017to2020.rds"))
+
+#   Clean up the county names 
+
+Old_county <- Old_county %>% 
+  mutate(County=str_to_title(County))
+
+Old_county[Old_county$County=="Dewitt",]$County <- "DeWitt"  # yeah, why do they spell it that way?
+
+All_county <- bind_rows(Old_county, New_county)
+
+saveRDS(All_county, paste0(output_folder, "Licenses_by_County_1997to2020.rds"))
+
+####     Zip data
+
+Old_zip <- readRDS(paste0(oldpath,"ZipPermitData.rds"))
+New_zip <- readRDS(paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
+
+All_zip <- bind_rows(Old_zip, New_zip)
+
+saveRDS(All_zip, paste0(output_folder, "Licenses_by_Zip_1997to2020.rds"))
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
 
