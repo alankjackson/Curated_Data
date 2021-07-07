@@ -74,6 +74,23 @@ Retrieved in 2016 and June 30, 2021
 Licenses_by_County_1997to2020.rds : Year, County, # applicants, %
 Licenses_by_Zip_1997to2020.rds : Year, Zipcode, # applicants, %
                               
+                            
+----------------
+HCAD - Harris County Appraisal District
+
+https://hcad.org/pdata/
+
+Real Property Data:
+real_neighborhood_code.txt : cd	grp_cd	dscr
+real_acct.txt : acct	yr	mailto	mail_addr_1	mail_addr_2	mail_city	mail_state	mail_zip	mail_country	undeliverable	str_pfx	str_num	str_num_sfx	str	str_sfx	str_sfx_dir	str_unit site_addr_1	site_addr_2	site_addr_3	state_class	school_dist	map_facet	key_map	Neighborhood_Code	Neighborhood_Grp	Market_Area_1	Market_Area_1_Dscr	Market_Area_2	Market_Area_2_Dscr	econ_area	econ_bld_class	center_code	yr_impr yr_annexed	splt_dt	dsc_cd	nxt_bld	bld_ar	land_ar	acreage	Cap_acct	shared_cad	land_val	bld_val	x_features_val	ag_val	assessed_val	tot_appr_val	tot_mkt_val	prior_land_val	prior_bld_val	prior_x_features_val	prior_ag_val	prior_tot_appr_val prior_tot_mkt_val	new_construction_val	tot_rcn_val	value_status	noticed	notice_dt	protested	certified_date	rev_dt	rev_by	new_own_dt	lgl_1	lgl_2	lgl_3	lgl_4	jurs
+
+permits.txt : acct	id	agency_id	status	dscr	dor_cd	permit_type	permit_tp_descr	property_tp	issue_date	yr	site_num	site_pfx	site_str	site_tp	site_sfx	site_apt 
+parcel_tieback.txt : acct	tp	dscr	related_acct	pct
+owners.txt : acct	ln_num	name	aka	pct_own
+deeds.txt : acct	dos	clerk_yr	clerk_id	deed_id
+
+Retrieved July 5, 2021 for 2005-2020
+
 
 
 
