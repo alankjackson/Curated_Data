@@ -1,0 +1,91 @@
+---
+title: "Texas MSA Regions"
+author: "Alan Jackson"
+date: "7/8/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(readxl)
+
+outpath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_MSA_Areas/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    Read in spreadsheet of MSA areas
+
+The data comes from the Texas center for Health Statistics, the state
+health department.
+
+https://www.dshs.state.tx.us/regions/default.shtm
+
+Original file has:
+ County Name 	FIPS #	 County # 	Public Health Region (11)	Health Service Region (8)	Metropolitan Statistical Area (MSA)	Metropolitan Divisions (MD)	Metro Area (82)	NCHS Urban Rural Classification (2006)	NCHS Urban Rural Classification (2013)	Border 32 (La Paz Agreement)	Border 15
+
+
+```{r read spreadsheet}
+
+path <- "/home/ajackson/Dropbox/Rprojects/Covid/MiscData/"
+my_file <- paste0(path, "PHR_MSA_County_masterlist.xlsx")
+
+foo <- read_excel(my_file) %>% 
+  rename(County=1, FIPS=2, Public_health_region=4, Long_MSA=6) %>% 
+  select(County, FIPS, Public_health_region, Long_MSA) %>% 
+  filter(!is.na(Public_health_region))
+
+```
+
+Add the county population to each county so we can calculate the MSA pop
+
+Also shorten the MSA names to something easier to deal with
+
+```{r add population}
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Demographics/"
+
+Counties <- readRDS(paste0(path, "County_Age_Sex.rds")) %>% 
+  select(oldFIPS=FIPS, Total_pop) %>% 
+  mutate(FIPS=as.character(oldFIPS)) %>% 
+  select(-oldFIPS) %>% 
+  mutate(FIPS=str_remove(FIPS,"^48")) # remove state code
+
+foo <- left_join(foo, Counties, by="FIPS")
+
+foo <-
+  foo %>%
+  mutate(
+    MSA = case_when(
+      Long_MSA=="Austin-Round Rock"                ~ "Austin",
+      Long_MSA=="Brownsville-Harlingen"            ~ "Brownsville",
+      Long_MSA=="Dallas-Fort Worth-Arlington"      ~ "Dallas-Fort Worth",
+      Long_MSA=="Houston-The Woodlands-Sugar Land" ~ "Houston-Galv",
+      Long_MSA=="McAllen-Edinburgh-Mission"        ~ "McAllen",
+      Long_MSA=="San Antonio-New Braunfels"        ~ "San Antonio",
+      Long_MSA=="Sherman-Denison"                  ~ "Sherman",
+      TRUE                                    ~ Long_MSA
+    )
+  ) %>% 
+  mutate(MSA=ifelse(((MSA=="--")&between(Total_pop, 25000, 100000)),
+                     "moderate",MSA)) %>% 
+  mutate(MSA=ifelse(((MSA=="--")&between(Total_pop, 5000, 25000)),
+                     "small",MSA)) %>% 
+  mutate(MSA=ifelse(((MSA=="--")&Total_pop<5000),
+                     "tiny",MSA)) 
+
+#     Collapse by MSA
+
+foo2 <- foo %>% 
+  group_by(MSA) %>% 
+    summarise(Population=sum(Total_pop), 
+              Counties=list(sort(unique(County)))) %>% 
+  ungroup()
+
+#   Save the two files out
+
+
+
+```
+
+
