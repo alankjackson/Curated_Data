@@ -91,7 +91,12 @@ deeds.txt : acct	dos	clerk_yr	clerk_id	deed_id
 
 Retrieved July 5, 2021 for 2005-2020
 
+---------------------------
+Texas Trauma Service Areas
 
+http://txrules.elaws.us/rule/title25_chapter157_sec.157.122
+
+Counties_per_area.tsv : area_code, area_name, county list
 
 
 

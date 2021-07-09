@@ -1,0 +1,63 @@
+---
+title: "Texas Trauma Service Areas"
+author: "Alan Jackson"
+date: "7/7/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Trauma_Service_Areas/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Texas Trauma Service Areas
+
+Could not find a nice list of the counties in each service area, so after 
+a cut and paste created a file I can use to create a dictionary.
+
+```{r}
+
+foo <- tribble(
+  ~Area_code, ~Area_name, ~County_list, 
+"A", "Amarillo", list("Armstrong", "Briscoe", "Carson", "Childress", "Collingsworth", "Dallam", "Deaf Smith", "Donley", "Gray", "Hall", "Hansford", "Hartley", "Hemphill", "Hutchinson", "Lipscomb", "Moore", "Ochiltree", "Oldham", "Parmer", "Potter", "Randall", "Roberts", "Sherman", "Swisher", "Wheeler"),
+"B", "Lubbock", list("Bailey", "Borden", "Castro", "Cochran", "Cottle", "Crosby", "Dawson", "Dickens", "Floyd", "Gaines", "Garza", "Hale", "Hockley", "Kent", "King", "Lamb", "Lubbock", "Lynn", "Motley", "Scurry", "Terry", "Yoakum"),
+"C", "Wichita Falls", list("Archer", "Baylor", "Clay", "Foard", "Hardeman", "Jack", "Montague", "Wichita", "Wilbarger", "Young"),
+"D", "Abilene", list("Brown", "Callahan", "Coleman", "Comanche", "Eastland", "Fisher", "Haskell", "Jones", "Knox", "Mitchell", "Nolan", "Shackelford", "Stephens", "Stonewall", "Taylor", "Throckmorton"),
+"E", "Dallas/Ft. Worth", list("Collin", "Cooke", "Dallas", "Denton", "Ellis", "Erath", "Fannin", "Grayson", "Hood", "Hunt", "Johnson", "Kaufman", "Navarro", "Palo Pinto", "Parker", "Rockwall", "Somervell", "Tarrant", "Wise"),
+"F", "Paris", list("Bowie", "Cass", "Delta", "Hopkins", "Lamar", "Morris", "Red River", "Titus"),
+"G", "Longview/Tyler", list("Anderson", "Camp", "Cherokee", "Franklin", "Freestone", "Gregg", "Harrison", "Henderson", "Houston", "Marion", "Panola", "Raines", "Rusk", "Shelby", "Smith", "Trinity", "Upshur", "Van Zandt", "Wood"),
+"H", "Lufkin", list("Angelina", "Nacogdoches", "Polk", "Sabine", "San Augustine", "San Jacinto", "Tyler"),
+"I", "El Paso", list("Culberson", "El Paso", "Hudspeth"),
+"J", "Midland/Odessa", list("Andrews", "Brewster", "Crane", "Ector", "Glasscock", "Howard", "Jeff Davis", "Loving", "Martin", "Midland", "Pecos", "Presidio", "Reeves", "Terrell", "Upton", "Ward", "Winkler"),
+"K", "San Angelo", list("Coke", "Concho", "Crockett", "Irion", "Kimble", "Mason", "McCulloch", "Menard", "Reagan", "Runnels", "Schleicher", "Sterling", "Sutton", "Tom Green"),
+"L", "Belton/Killeen", list("Bell", "Coryell", "Falls", "Hamilton", "Lampasas", "Milam", "Mills"),
+"M", "Waco", list("Bosque", "Hill", "Limestone", "McLennan"),
+"N", "Bryan/College Station", list("Brazos", "Burleson", "Grimes", "Leon", "Madison", "Robertson", "Washington"),
+"O", "Austin", list("Bastrop", "Blanco", "Burnet", "Caldwell", "Fayette", "Hays", "Lee", "Llano", "San Saba", "Travis", "Williamson"),
+"P", "San Antonio", list("Atascosa", "Bandera", "Bexar", "Comal", "Dimmit", "Edwards", "Frio", "Gillespie", "Gonzales", "Guadalupe", "Karnes", "Kendall", "Kerr", "Kinney", "La Salle", "Maverick", "Medina", "Real", "Uvalde", "Val Verde", "Wilson", "Zavala"),
+"Q", "Houston", list("Austin", "Colorado", "Fort Bend", "Harris", "Matagorda", "Montgomery", "Walker", "Waller", "Wharton"),
+"R", "Galveston", list("Brazoria", "Chambers", "Galveston", "Hardin", "Jasper", "Jefferson", "Liberty", "Newton", "Orange"),
+"S", "Victoria", list("Calhoun", "Dewitt", "Goliad", "Jackson", "Lavaca", "Victoria"),
+"T", "Laredo", list("Jim Hogg", "Webb", "Zapata"),
+"U", "Corpus Christi", list("Aransas", "Bee", "Brooks", "Duval", "Jim Wells", "Kenedy", "Kleberg", "Live Oak", "McMullen", "Nueces", "Refugio", "San Patricio"),
+"V", "Lower Rio Grande Valley", list("Cameron", "Hidalgo", "Starr", "Willacy")
+
+)
+
+foo <- 
+foo %>% unnest(County_list) %>% 
+  group_by(County_list) %>% 
+    mutate(County=County_list[[1]]) %>% 
+  ungroup() %>% 
+  select(Area_code, Area_name, County)
+
+saveRDS(foo, paste0(path, "Trauma_Service_Areas.rds"))
+
+```
+
+
+
+
