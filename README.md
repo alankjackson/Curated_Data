@@ -98,5 +98,7 @@ http://txrules.elaws.us/rule/title25_chapter157_sec.157.122
 
 Counties_per_area.tsv : area_code, area_name, county list
 
+Trauma_Service_Areas.rds : Area_code, Area_name, County
+
 
 
