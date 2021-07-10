@@ -103,5 +103,21 @@ Trauma_Service_Areas.rds : Area_code, Area_name, County
 ---------------------------
 Texas MSA regions
 
+The data comes from the Texas center for Health Statistics, the state
+health department.
+
+https://www.dshs.state.tx.us/regions/default.shtm
+
+Original file PHR_MSA_County_masterlist.xlsx has:
+ County Name 	FIPS #	 County # 	Public Health Region (11)
+ Health Service Region (8)	Metropolitan Statistical Area (MSA)
+ Metropolitan Divisions (MD)	Metro Area (82)
+ NCHS Urban Rural Classification (2006)	NCHS Urban Rural Classification (2013)
+ Border 32 (La Paz Agreement)	Border 15
+ 
+Counties_in_each_MSA.rds : For each MSA, population and a list of counties
+MSA_for_each_county.rds : For each county, MSA, FIPS, Pub Health Region
+
+
 
 
