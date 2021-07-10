@@ -31,9 +31,10 @@ zipfile <- paste0(path, "HCAD/Real_acct_owner_2005.zip")
 
 df <- readr::read_tsv(unz(description = zipfile, filename = "real_acct.txt"), col_names = TRUE, col_types = strrep("c", 71)) %>% 
   select(acct, yr, contains("str_"), contains("site_addr"), bld_ar, land_ar,
-         land_val, bld_val, assessed_val, tot_appr_val, tot_mkt_val)
+         land_val, bld_val, assessed_val, tot_appr_val, tot_mkt_val,
+         new_own_dt)
 
-
+#   Are there more columns I can drop?
 
 ```
 
