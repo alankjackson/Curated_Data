@@ -84,7 +84,10 @@ foo2 <- foo %>%
 
 #   Save the two files out
 
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_MSA_Areas/"
 
+saveRDS(foo, paste0(path, "MSA_for_each_county.rds"))
+saveRDS(foo2, paste0(path, "Counties_in_each_MSA.rds"))
 
 ```
 
