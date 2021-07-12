@@ -40,7 +40,7 @@ foo <- tribble(
 "P", "San Antonio", list("Atascosa", "Bandera", "Bexar", "Comal", "Dimmit", "Edwards", "Frio", "Gillespie", "Gonzales", "Guadalupe", "Karnes", "Kendall", "Kerr", "Kinney", "La Salle", "Maverick", "Medina", "Real", "Uvalde", "Val Verde", "Wilson", "Zavala"),
 "Q", "Houston", list("Austin", "Colorado", "Fort Bend", "Harris", "Matagorda", "Montgomery", "Walker", "Waller", "Wharton"),
 "R", "Galveston", list("Brazoria", "Chambers", "Galveston", "Hardin", "Jasper", "Jefferson", "Liberty", "Newton", "Orange"),
-"S", "Victoria", list("Calhoun", "Dewitt", "Goliad", "Jackson", "Lavaca", "Victoria"),
+"S", "Victoria", list("Calhoun", "DeWitt", "Goliad", "Jackson", "Lavaca", "Victoria"),
 "T", "Laredo", list("Jim Hogg", "Webb", "Zapata"),
 "U", "Corpus Christi", list("Aransas", "Bee", "Brooks", "Duval", "Jim Wells", "Kenedy", "Kleberg", "Live Oak", "McMullen", "Nueces", "Refugio", "San Patricio"),
 "V", "Lower Rio Grande Valley", list("Cameron", "Hidalgo", "Starr", "Willacy")
