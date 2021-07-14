@@ -9,7 +9,9 @@ output: html_document
 library(tidyverse)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Trauma_Service_Areas/"
+path_county <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Counties/"
 
+Counties <- readRDS(paste0(path_county, "County_Names.rds"))
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -52,7 +54,10 @@ foo %>% unnest(County_list) %>%
   group_by(County_list) %>% 
     mutate(County=County_list[[1]]) %>% 
   ungroup() %>% 
-  select(Area_code, Area_name, County)
+  select(Area_code, Area_name, County) %>% 
+  left_join(., Counties, by=c("County"="CNTY_NM")) %>% 
+  select(Area_code, Area_name, County, FID)  
+  
 
 saveRDS(foo, paste0(path, "Trauma_Service_Areas.rds"))
 
