@@ -93,6 +93,11 @@ DF <- read_excel(paste0(path, "QT-P1a_AgeGroupsAndSex_SF12010_Shell.xls"),
 
 names(DF) <- Columns
 
+#   Make FIPS code character and remove state code
+
+DF$FIPS <- as.character(DF$FIPS)
+DF$FIPS <- str_remove(DF$FIPS, "^48")
+
 #   Standardize county names
 
 Counties <- Counties %>% select(FIPS_ST_CNTY_CD, CNTY_NM)
@@ -101,7 +106,7 @@ DF <- left_join(DF, Counties, by=c("FIPS"="FIPS_ST_CNTY_CD")) %>%
   select(-Geography) %>% 
   relocate(CNTY_NM)
 
-DF <- DF[-1,] # drop "Texas" row leaving only counties
+#DF <- DF[-1,] # drop "Texas" row leaving only counties
   
 saveRDS(DF, paste0(path, "County_Age_Sex.rds"))
 
