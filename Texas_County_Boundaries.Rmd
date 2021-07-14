@@ -29,6 +29,11 @@ Counties <- read_csv(paste0(path, "Texas_County_Boundaries.csv")) %>%
 
 Counties$CNTY_NM[Counties$CNTY_NM=="De Witt"] <- "DeWitt"
 
+# Make FIPS code character and remove state code
+
+Counties$FIPS_ST_CNTY_CD <- as.character(Counties$FIPS_ST_CNTY_CD)
+Counties$FIPS_ST_CNTY_CD <- str_remove(Counties$FIPS_ST_CNTY_CD, "^48")
+
 # Save file out
 
 saveRDS(Counties, paste0(path, "County_Names.rds"))
