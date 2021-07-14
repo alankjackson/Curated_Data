@@ -56,7 +56,7 @@ foo %>% unnest(County_list) %>%
   ungroup() %>% 
   select(Area_code, Area_name, County) %>% 
   left_join(., Counties, by=c("County"="CNTY_NM")) %>% 
-  select(Area_code, Area_name, County, FID)  
+  select(Area_code, Area_name, County, FIPS=FIPS_ST_CNTY_CD)  
   
 
 saveRDS(foo, paste0(path, "Trauma_Service_Areas.rds"))
