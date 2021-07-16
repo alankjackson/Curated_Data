@@ -31,20 +31,20 @@ for (year in "2005":"2020") {
   zipfile <- paste0(path, "HCAD/Real_acct_owner_", year,".zip")
   
   df <- readr::read_tsv(unz(description = zipfile, filename = "real_acct.txt"), col_names = TRUE, col_types = strrep("c", 71)) %>% 
-    select(acct, yr, contains("site_addr"), bld_ar, land_ar,
+    select(acct, yr, state_class, contains("site_addr"), bld_ar, land_ar,
            land_val, bld_val, assessed_val, tot_appr_val, tot_mkt_val,
            new_own_dt)
   
   #   Are there rows I can drop? About 100,000!
   
-  df <- df %>% 
-    #   Drop tot_mkt_val = 0. I don't know what that means, but it 
-    #   isn't useful to me.
-    filter(tot_mkt_val>0) %>% 
-    #   Drop site_addr_1 == 0. Don't know what that is, but limited usefulness.
-    filter(site_addr_1!="0") %>% 
-    #   Drop site_addr_2 or site_addr_3 of NA
-    filter(!is.na(site_addr_2), !is.na(site_addr_3))
+#  df <- df %>% 
+#    #   Drop tot_mkt_val = 0. I don't know what that means, but it 
+#    #   isn't useful to me.
+#    filter(tot_mkt_val>0) %>% 
+#    #   Drop site_addr_1 == 0. Don't know what that is, but limited usefulness.
+#    filter(site_addr_1!="0") %>% 
+#    #   Drop site_addr_2 or site_addr_3 of NA
+#    filter(!is.na(site_addr_2), !is.na(site_addr_3))
   
   # These files are really large, so let's store them by year.
   
