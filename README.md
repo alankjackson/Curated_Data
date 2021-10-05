@@ -126,6 +126,11 @@ Original file PHR_MSA_County_masterlist.xlsx has:
 Counties_in_each_MSA.rds : For each MSA, population and a list of counties
 MSA_for_each_county.rds : For each county, MSA, FIPS, Pub Health Region
 
+---------------------------
+Elevation data from USGS
 
+https://apps.nationalmap.gov/downloader/#/
+
+Data is an IMG file of a 1/9 arcsecond DEM
 
 
