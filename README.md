@@ -131,6 +131,6 @@ Elevation data from USGS
 
 https://apps.nationalmap.gov/downloader/#/
 
-Data is an IMG file of a 1/9 arcsecond DEM
+Data is an IMG file of a 1/9 arcsecond DEM (approx 3 meters)
 
 
