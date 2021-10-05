@@ -1,0 +1,53 @@
+---
+title: "DEM_data"
+author: "Alan Jackson"
+date: "9/30/2021"
+output: html_document
+---
+
+
+rgdal::readgdal for reading in the IMG file
+
+Then manipulate with package raster
+
+
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(rgdal)
+library(raster)
+library(rgdal)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/DEMs/TestFiles/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  read in the DEMs
+
+```{r read}
+
+img <- raster(paste0(path, "ned19_n30x00_w095x50_tx_houstoncity_2008.img"))
+
+img_df <- as.data.frame(img, xy=TRUE)
+
+ggplot() +
+    geom_raster(data = img_df , aes(x = x, y = y, fill = ned19_n30x00_w095x50_tx_houstoncity_2008)) +
+    scale_fill_viridis_c() +
+    coord_quickmap()
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
