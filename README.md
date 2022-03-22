@@ -90,8 +90,9 @@ owners.txt : acct	ln_num	name	aka	pct_own
 deeds.txt : acct	dos	clerk_yr	clerk_id	deed_id
 
 Retrieved July 5, 2021 for 2005-2020
+Retrieved March 21, 2022 to add 2021 data.
 
-Datasets are named Values_xxxx.rds where xxxx = year from 1995 to 2020
+Datasets are named Values_xxxx.rds where xxxx = year from 1995 to 2021
 Variables in datasets are:
 "acct", "yr", "state_class", "site_addr_1", "site_addr_2", 
 "site_addr_3", "bld_ar", "land_ar", "land_val", "bld_val", 
