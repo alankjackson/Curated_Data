@@ -27,7 +27,7 @@ quickly as possible.
 
 ```{r read files}
 
-for (year in "2005":"2020") {
+for (year in "2005":"2021") {
   zipfile <- paste0(path, "HCAD/Real_acct_owner_", year,".zip")
   
   df <- readr::read_tsv(unz(description = zipfile, filename = "real_acct.txt"), col_names = TRUE, col_types = strrep("c", 71)) %>% 
