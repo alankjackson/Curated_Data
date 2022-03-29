@@ -27,14 +27,116 @@ Let's explore each column, with an eye towards possibly transforming them to
 a better data type (dates should be dates, for example)
 
 ```{r QC and Explore}
+# Longitude
+
+df %>% select(X) %>% 
+  ggplot() +
+  geom_histogram(aes(x=X))
+
+# Latitude
+
+df %>% select(Y) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Y))
+
+# Objectid
+
+#   Can I safely convert to numeric?
+
+df %>% select(OBJECTID) %>% 
+  mutate(Objectid = as.integer(OBJECTID)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Objectid))
+
+# ID (same question)
+
+df %>% select(ID) %>% 
+  mutate(Id = as.integer(ID)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Id))
+
+# ADDR_ID (same question)
+
+df %>% select(ADDR_ID) %>% 
+  mutate(Addr_id = as.integer(ADDR_ID)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Addr_id))
+
+# TYPES
+
+df %>% select(TYPES) %>% 
+  filter(!is.na(TYPES)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=TYPES), stat="count") +
+  coord_flip()
+
+# STATUS
+
+df %>% select(STATUS) %>% 
+  ggplot() +
+  geom_histogram(aes(x=STATUS), stat="count") +
+  coord_flip()
+```
+
+Lat longs, and all the ID fields seem well enough behaved. Not sure about TYPES,
+it seems to be left blank most of the time, so its usefulness is questionable.
+
+Status is curious. It is always filled in, and some of the meaning seem obvious.
+ABD is obviously abandoned. CNTY = county, COH = City of Houston. I think CP 
+means that the location was reported? by Center Point? I don't know what the rest mean. Not really a clue. Except that UTA may have something to do with utilities.
 
 
+```{r QC and Explore more}
+
+# STREET_NUM
+
+df %>% select(STREET_NUM) %>% 
+  filter(str_starts(STREET_NUM, " ")) # test for beginning blank
+
+df %>% select(STREET_NUM) %>% 
+  filter(str_detect(STREET_NUM, " [0-9]")) # test for blank then number
+  
+dfnew <- df %>% 
+  mutate(STREET_NUM = str_remove(STREET_NUM, "^[1-2]+/+[1-9]+")) %>% 
+  mutate(STREET_NUM = str_remove(STREET_NUM, "[^0-9A-Z#/\\s]")) %>% 
+  mutate(Street_alpha = str_trim(str_remove(STREET_NUM, "^\\d+")))  
+
+dfnew %>% 
+  filter(Street_alpha!="") %>% 
+  ggplot() +
+  geom_histogram(aes(x=Street_alpha), stat="count", na.rm=TRUE) +
+  coord_flip() 
+  
+dfnew <- dfnew %>% 
+  mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
+  filter(Street_num<49999)  
+
+dfnew %>% 
+  ggplot() +
+  geom_histogram(aes(x=Street_num)) 
+  
+
+```
+### STREET_NUM
+
+Now it gets messy.
+
+The street numbers have junk in them - sometimes.
+
+4107 B
+606 #3
+1/2
+35 1/2
+13410.
+
+So we'll try to clean up at least most of this. We'll create two new variables, Street_num and Street_alpha.
+
+```{r QC and explore even more}
 
 
 
 
 ```
-
 
 
 
