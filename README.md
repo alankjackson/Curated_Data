@@ -134,4 +134,17 @@ https://apps.nationalmap.gov/downloader/#/
 
 Data is an IMG file of a 1/9 arcsecond DEM (approx 3 meters)
 
+---------------------------
+Permit data for the city of Houston
+
+https://www.houstontx.gov/planning/DevelopRegs/dev_reports.html
+
+Weekly data files form 2017 forward. Stored as tables in a docx file.
+
+---------------------------
+Address points (lat-longs for street addresses) City of Houston
+
+https://cohgis-mycity.opendata.arcgis.com/search?q=address
+
+CSV file of location and address
 
