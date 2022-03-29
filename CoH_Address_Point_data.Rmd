@@ -1,0 +1,44 @@
+---
+title: "Read in CoH Address POint data"
+author: "Alan Jackson"
+date: '2022-03-29'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/CoH_Address_Points/"
+
+filename <- "COH_PDD_ADDRESS_POINTS_-_PDD.csv"
+
+df <- read_csv(paste0(path, filename),
+               col_types="nnccccccccccccccnnccccccccccccccc")
+
+```
+
+##    Quality control and Explore
+
+Data read in mostly as character, except for lat long and xy coordinates.
+
+Let's explore each column, with an eye towards possibly transforming them to 
+a better data type (dates should be dates, for example)
+
+```{r QC and Explore}
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
