@@ -48,6 +48,10 @@ df %>% select(OBJECTID) %>%
   ggplot() +
   geom_histogram(aes(x=Objectid))
 
+df %>% select(OBJECTID) %>% 
+  mutate(Objectid = as.integer(OBJECTID)) %>% 
+  count()
+  
 # ID (same question)
 
 df %>% select(ID) %>% 
@@ -133,12 +137,140 @@ So we'll try to clean up at least most of this. We'll create two new variables, 
 
 ```{r QC and explore even more}
 
+#   Fraction
 
-
+dfnew %>% 
+  filter(FRACTION!="") %>% 
+  select(FRACTION) %>% 
+  unique
 
 ```
 
+Hmm... some trash in the FRACTION field. Period, square bracket, slash... 
+Sometimes it matches what I have designated Street_alpha, but not always.
 
+```{r PREFIX}
+
+dfnew %>% 
+  filter(PREFIX!="") %>% 
+  select(PREFIX) %>% 
+  unique
+
+dfnew <- 
+dfnew %>% 
+  mutate(PREFIX=str_to_upper(PREFIX))
+
+dfnew$PREFIX[!is.na(dfnew$PREFIX) & str_detect(dfnew$PREFIX, "[^NSEW]")] <- NA
+
+```
+
+A few bad entries. the "C" is pulled from the street number so can be deleted.
+The lower case directions can be repaired.
+
+```{r STREET NAME}
+
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+dfnew %>% count(STREET_NAME, sort=TRUE) %>% 
+  filter(n<5)
+
+dfnew %>% count(STREET_NAME, sort=TRUE) %>% 
+  filter(n<10) %>% 
+  ggplot() +
+  geom_histogram(aes(x=n))
+
+#   We have some bad names. Let's look at low occurrence names and have nearby 
+#   names vote on the proper name
+
+#   First shrink dataset size, then make an sf object
+#   Nah, just use zipcode and text distance
+#   But then look at physical distance as a fine tuning check
+
+#   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
+
+dftest <- 
+dfnew %>% 
+#  head() %>% 
+  #select(OBJECTID, STREET_NAME, Street_num, ZIPCODE)# %>% 
+  select(OBJECTID, STREET_NAME, Street_num, ZIPCODE, X_COORD, Y_COORD)# %>% 
+  #sf::st_as_sf(., coords=c("X_COORD", "Y_COORD"))
+
+#   data frame of single occurrence names
+df_singles <- dftest %>% 
+  group_by(STREET_NAME) %>% 
+  mutate(count=n()) %>% 
+  filter(count<2) %>% 
+  select(-count) %>% 
+  filter(str_length(STREET_NAME)>3) %>% #  eliminate short names
+  filter(!str_detect(STREET_NAME, "STREET")) %>% # eliminate A STREET, B STREET
+  filter(!str_detect(STREET_NAME, "^\\d+TH")) %>% # eliminate 4TH, 5TH, etc
+  filter(!str_detect(STREET_NAME, "^CR \\d+")) # eliminate county roads
+
+#   data frame of double occurrence names
+df_doubles <- dftest %>% 
+  group_by(STREET_NAME) %>% 
+  mutate(count=n()) %>% 
+  filter(count==2) %>% 
+  select(-count) %>% 
+  filter(str_length(STREET_NAME)>3) %>% #  eliminate short names
+  filter(!str_detect(STREET_NAME, "STREET")) %>% # eliminate A STREET, B STREET
+  filter(!str_detect(STREET_NAME, "^\\d+TH")) %>% # eliminate 4TH, 5TH, etc
+  filter(!str_detect(STREET_NAME, "^CR \\d+")) # eliminate county roads
+
+##    function to get text distances and geometric distances
+
+get_corrections <- function(df_test, df_base, text_dist, geom_dist, min_votes){
+  tmp <- NULL
+  for (i in 1:nrow(df_test)) {
+    foo <- df_test[i,]
+    foobar <- 
+    df_base %>% filter(ZIPCODE==foo$ZIPCODE) %>% 
+      mutate(adist=adist(STREET_NAME, foo$STREET_NAME),
+             bad_X=foo$X_COORD,
+             bad_Y=foo$Y_COORD,
+             bad_num=foo$Street_num,
+             bad_name=foo$STREET_NAME,
+             bad_id=foo$OBJECTID) %>% 
+      filter(adist == text_dist) %>% 
+      mutate(eucdist=sqrt((X_COORD - bad_X)^2 +
+                          (Y_COORD-bad_Y)^2)) %>% 
+      group_by(STREET_NAME) %>%
+         summarize(n=n(),
+                   Street_num=last(bad_num),
+                   STREET_NAME=last(STREET_NAME),
+                   bad_name=last(bad_name),
+                   bad_id=last(bad_id),
+                   min_dist=min(eucdist)
+                   ) %>%
+      ungroup() %>%
+      filter(n>min_votes,
+             min_dist<geom_dist)
+    
+      tmp <- bind_rows(tmp, foobar) 
+  }
+  return(tmp)
+}
+
+#  Loop through singles, get distances to all in zipcode, then get text distance
+
+tmp <- get_corrections(df_singles, dftest, 1, 1060, 3)
+
+df_singles <- df_singles[!df_singles$OBJECTID %in% tmp$bad_id,]
+
+tmp2 <- get_corrections(df_singles, dftest, 2, 300, 5)
+
+df_singles <- df_singles[!df_singles$OBJECTID %in% tmp2$bad_id,]
+df_singles <- df_singles %>% filter(!OBJECTID=="76158") %>% 
+                             filter(!OBJECTID=="705381")
+
+tmp3 <- get_corrections(df_singles, dftest, 3, 300, 9)
+    
+#------   Now do doubles
+
+tmp4 <- get_corrections(df_doubles, dftest, 1, 500, 8)
+
+
+```
 
 
 
