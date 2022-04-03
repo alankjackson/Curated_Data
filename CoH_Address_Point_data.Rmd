@@ -256,21 +256,129 @@ get_corrections <- function(df_test, df_base, text_dist, geom_dist, min_votes){
 tmp <- get_corrections(df_singles, dftest, 1, 1060, 3)
 
 df_singles <- df_singles[!df_singles$OBJECTID %in% tmp$bad_id,]
+tmp[duplicated(tmp$bad_id),]
+tmp <- tmp %>% filter(!STREET_NAME=="INTERCONTINENT",
+                      !STREET_NAME=="MARY")
 
 tmp2 <- get_corrections(df_singles, dftest, 2, 300, 5)
 
 df_singles <- df_singles[!df_singles$OBJECTID %in% tmp2$bad_id,]
 df_singles <- df_singles %>% filter(!OBJECTID=="76158") %>% 
                              filter(!OBJECTID=="705381")
+tmp2[duplicated(tmp2$bad_id),]
 
 tmp3 <- get_corrections(df_singles, dftest, 3, 300, 9)
+tmp3[duplicated(tmp3$bad_id),]
     
 #------   Now do doubles
 
 tmp4 <- get_corrections(df_doubles, dftest, 1, 500, 8)
+tmp4[duplicated(tmp4$bad_id),]
 
+#------ Now update the original by adding a new field
+
+dfnew <- dfnew %>% mutate(New_street=STREET_NAME)
+
+dfnew[dfnew$OBJECTID %in% tmp$bad_id,]$New_street <- tmp$STREET_NAME 
+dfnew[dfnew$OBJECTID %in% tmp2$bad_id,]$New_street <- tmp2$STREET_NAME 
+dfnew[dfnew$OBJECTID %in% tmp3$bad_id,]$New_street <- tmp3$STREET_NAME 
+dfnew[dfnew$OBJECTID %in% tmp4$bad_id,]$New_street <- tmp4$STREET_NAME 
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file"))
 
 ```
+
+
+```{r suffixes}
+
+dfnew %>% 
+  filter(SUFFIX!="") %>% 
+  select(SUFFIX) %>% 
+  unique
+
+dfnew$SUFFIX[!is.na(dfnew$SUFFIX) & str_detect(dfnew$SUFFIX, "[^NSEW]")] <- NA
+
+```
+
+```{r street type}
+
+dfnew %>% 
+  filter(STREET_TYPE!="") %>% 
+  select(STREET_TYPE) %>% 
+  unique
+
+Street_types <- 
+dfnew %>% 
+      group_by(STREET_TYPE) %>%
+         summarize(n=n(),
+                   STREET_TYPE=last(STREET_TYPE)) %>% 
+  arrange(-n)
+
+#   a lot of mess here. Will use a similar strategy as used for street names.
+#   look at nearby friends and try to grab the type from them. Use total dataset
+#   n value to establish the "standard".
+#   Two tasks - look for missing types by checking nearby friends
+#   And check the existing type against the standards
+
+Allowed_types <- c(
+  "ALY", "ANX", "ARC", "AVE", "BYU", "BCH", "BND", "BLF", "BLFS", "BTM", "BLVD",
+  "BR", "BRG", "BRK", "BRKS", "BG", "BGS", "BYP", "CP", "CYN", "CPE", "CSWY", "CTR",
+  "CTRS", "CIR", "CIRS", "CLF", "CLFS", "CLB", "CMN", "CMNS", "COR", "CORS",
+  "CRSE", "CT", "CTS", "CV", "CVS", "CRK", "CRES", "CRST", "XING", "XRD", "XRDS",
+  "CURV", "DL", "DM", "DV", "DR", "DRS", "EST", "ESTS", "EXPY", "EXT", "EXTS", "FALL",
+  "FLS", "FRY", "FLD", "FLDS", "FLT", "FLTS", "FRD", "FRDS", "FRST", "FRG", "FRGS",
+  "FRK", "FRKS", "FT", "FWY", "GDN", "GDNS", "GTWY", "GLN", "GLNS", "GRN", "GRNS",
+  "GRV", "GRVS", "HBR", "HBRS", "HVN", "HTS", "HWY", "HL", "HLS", "HOLW", "INLT",
+  "IS", "ISS", "ISLE", "JCT", "JCTS", "KY", "KYS", "KNL", "KNLS", "LK", "LKS",
+  "LAND", "LNDG", "LN", "LGT", "LGTS", "LF", "LCK", "LCKS", "LDG", "LOOP", "MALL",
+  "MNR", "MNRS", "MDW", "MDWS", "MEWS", "ML", "MLS", "MSN", "MTWY", "MT", "MTN",
+  "MTNS", "NCK", "ORCH", "OVAL", "OPAS", "PARK", "PKWY", "PASS", "PSGE", "PATH",
+  "PIKE", "PNE", "PNES", "PL", "PLN", "PLNS", "PLZ", "PT", "PTS", "PRT", "PRTS",
+  "PR", "RADL", "RAMP", "RNCH", "RPD", "RPDS", "RST", "RDG", "RDGS", "RIV", "RD",
+  "RDS", "RTE", "ROW", "RUE", "RUN", "SHL", "SHLS", "SHR", "SHRS", "SKWY", "SPG",
+  "SPGS", "SPUR", "SQ", "SQS", "STA", "STRA", "STRM", "ST", "STS", "SMT", "TER",
+  "TRWY", "TRCE", "TRAK", "TRFY", "TRL", "TRLR", "TUNL", "TPKE", "UPAS", "UN",
+  "UNS", "VLY", "VLYS", "VIA", "VW", "VWS", "VLG", "VLGS", "VL", "VIS", "WALK",
+  "WALL", "WAY", "WAYS", "WL", "WLS")
+
+
+#   Let's look for erroneous types
+
+Street_types %>% filter(!is.na(STREET_TYPE)) %>% 
+  filter(!STREET_TYPE %in% Allowed_types)
+
+#   Well that is simple enough. In Houston, apparently, "Speedway" is a street
+#   type, so I'll leave that one alone. The rest I can update to the correct
+#   value.
+
+dfnew <- dfnew %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^PKY$", "PKWY")) %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^ROAD$", "RD")) %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^LANE$", "LN")) %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^TWY$", "CT"))  # not a tollway
+  
+#   Look at the NA's to see if they make sense
+
+#   For each street/zip pair sum up # types
+
+tmp <- 
+dfnew %>% group_by(ZIPCODE, STREET_NAME) %>% 
+      summarise(n=n(),
+                sumNA = sum(is.na(STREET_TYPE)),
+                NotNAs=list(unique(STREET_TYPE[!is.na(STREET_TYPE)]))) %>% 
+  filter(!sumNA==n) %>% 
+  mutate(NotNA=n-sumNA) %>% 
+  mutate(Flag=lengths(NotNAs)) %>% 
+  filter(sumNA>0) %>% 
+  mutate(NotNAs=paste(NotNAs)) %>% # convert list to string 
+  filter(Flag==1) # remove ambiguous cases where there are multiple types
+
+#   Let's first fix things that are not NA that should be
+#   
+
+```
+
+
 
 
 
