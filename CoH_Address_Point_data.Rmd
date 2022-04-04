@@ -371,10 +371,43 @@ dfnew %>% group_by(ZIPCODE, STREET_NAME) %>%
   mutate(Flag=lengths(NotNAs)) %>% 
   filter(sumNA>0) %>% 
   mutate(NotNAs=paste(NotNAs)) %>% # convert list to string 
-  filter(Flag==1) # remove ambiguous cases where there are multiple types
+  filter(Flag==1)  # remove ambiguous cases where there are multiple types
 
 #   Let's first fix things that are not NA that should be
 #   
+
+tmp_rm_not_na <- tmp %>% 
+  filter(n>9) %>% # need at least 10 to believe statistics
+  mutate(foo=(NotNA/n)) %>% 
+  filter((NotNA/n)<0.151) %>% 
+  filter(!NotNAs=="CT") # don't trust 'court', leave alone
+
+#   Apply what is left to NA that field
+
+for (i in 1:nrow(tmp_rm_not_na)){
+  dfnew$STREET_TYPE[(dfnew$ZIPCODE==tmp_rm_not_na[[i,1]]) & 
+          (dfnew$STREET_NAME==tmp_rm_not_na[[i,2]])] <- NA
+}
+  
+# Now let's fix things that are NA but shouldn't be
+
+tmp_rm_na <- tmp %>% 
+  filter(n>9) %>% # need at least 10 to believe statistics
+  mutate(foo=(NotNA/n)) %>% 
+  filter((NotNA/n)>0.810) %>% 
+  filter(!NotNAs=="CT") %>% # don't trust 'court', leave alone
+  filter(!NotNAs=="CIR") %>% # don't trust 'circle', leave alone
+  filter(!NotNAs=="PL") # don't trust 'place', leave alone
+
+#   Apply what is left to fill that field
+
+eraseme <- dfnew
+for (i in 1:nrow(tmp_rm_na)){
+  dfnew$STREET_TYPE[(dfnew$ZIPCODE==tmp_rm_na[[i,1]]) & 
+          (dfnew$STREET_NAME==tmp_rm_na[[i,2]])] <- tmp_rm_na[[i,5]]
+}
+  
+
 
 ```
 
