@@ -284,7 +284,13 @@ dfnew[dfnew$OBJECTID %in% tmp2$bad_id,]$New_street <- tmp2$STREET_NAME
 dfnew[dfnew$OBJECTID %in% tmp3$bad_id,]$New_street <- tmp3$STREET_NAME 
 dfnew[dfnew$OBJECTID %in% tmp4$bad_id,]$New_street <- tmp4$STREET_NAME 
 
-saveRDS(dfnew, paste0(path, "temporary_intermediate_file"))
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_1"))
+
+```
+
+```{r reload}
+
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_1"))
 
 ```
 
@@ -376,6 +382,10 @@ dfnew %>% group_by(ZIPCODE, STREET_NAME) %>%
 #   Let's first fix things that are not NA that should be
 #   
 
+#   Add new field so we retain original values
+
+dfnew <- dfnew %>% mutate(Street_type = STREET_TYPE) 
+
 tmp_rm_not_na <- tmp %>% 
   filter(n>9) %>% # need at least 10 to believe statistics
   mutate(foo=(NotNA/n)) %>% 
@@ -385,7 +395,7 @@ tmp_rm_not_na <- tmp %>%
 #   Apply what is left to NA that field
 
 for (i in 1:nrow(tmp_rm_not_na)){
-  dfnew$STREET_TYPE[(dfnew$ZIPCODE==tmp_rm_not_na[[i,1]]) & 
+  dfnew$Street_type[(dfnew$ZIPCODE==tmp_rm_not_na[[i,1]]) & 
           (dfnew$STREET_NAME==tmp_rm_not_na[[i,2]])] <- NA
 }
   
@@ -401,17 +411,44 @@ tmp_rm_na <- tmp %>%
 
 #   Apply what is left to fill that field
 
-eraseme <- dfnew
 for (i in 1:nrow(tmp_rm_na)){
-  dfnew$STREET_TYPE[(dfnew$ZIPCODE==tmp_rm_na[[i,1]]) & 
+  dfnew$Street_type[(dfnew$ZIPCODE==tmp_rm_na[[i,1]]) & 
           (dfnew$STREET_NAME==tmp_rm_na[[i,2]])] <- tmp_rm_na[[i,5]]
 }
   
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_2"))
 
 
 ```
 
 
+```{r revisit prefix}
+
+#   Can we grab nearby prefixes to repair missing ones?
+
+#   Let's shrink dataset size
+dftest <- 
+dfnew %>% 
+  select(OBJECTID, Street_num, PREFIX, New_street, Street_type, 
+         ZIPCODE, X_COORD, Y_COORD) 
+
+#   Now start analysis by street name, type, and zipcode
+
+tmp <- 
+dftest %>% group_by(ZIPCODE, New_street, Street_type) %>% 
+      summarise(n=n(),
+                sumNA = sum(is.na(PREFIX)),
+                sumE = sum(PREFIX=="E", na.rm=TRUE),
+                sumW = sum(PREFIX=="W", na.rm=TRUE),
+                sumN = sum(PREFIX=="N", na.rm=TRUE),
+                sumS = sum(PREFIX=="S", na.rm=TRUE)) %>%
+  mutate(singlet = n-sumNA) %>% 
+  filter(!sumNA==n) %>% 
+  filter(sumNA>0) 
+
+
+
+```
 
 
 
