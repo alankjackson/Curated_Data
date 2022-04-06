@@ -3,6 +3,9 @@ title: "Read in CoH Address POint data"
 author: "Alan Jackson"
 date: '2022-03-29'
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
@@ -19,12 +22,13 @@ df <- read_csv(paste0(path, filename),
 
 ```
 
-##    Quality control and Explore
+## Quality control and Explore
 
-Data read in mostly as character, except for lat long and xy coordinates.
+Data read in mostly as character, except for lat long and xy
+coordinates.
 
-Let's explore each column, with an eye towards possibly transforming them to 
-a better data type (dates should be dates, for example)
+Let's explore each column, with an eye towards possibly transforming
+them to a better data type (dates should be dates, for example)
 
 ```{r QC and Explore}
 # Longitude
@@ -82,13 +86,15 @@ df %>% select(STATUS) %>%
   coord_flip()
 ```
 
-Lat longs, and all the ID fields seem well enough behaved. Not sure about TYPES,
-it seems to be left blank most of the time, so its usefulness is questionable.
+Lat longs, and all the ID fields seem well enough behaved. Not sure
+about TYPES, it seems to be left blank most of the time, so its
+usefulness is questionable.
 
-Status is curious. It is always filled in, and some of the meaning seem obvious.
-ABD is obviously abandoned. CNTY = county, COH = City of Houston. I think CP 
-means that the location was reported? by Center Point? I don't know what the rest mean. Not really a clue. Except that UTA may have something to do with utilities.
-
+Status is curious. It is always filled in, and some of the meaning seem
+obvious. ABD is obviously abandoned. CNTY = county, COH = City of
+Houston. I think CP means that the location was reported? by Center
+Point? I don't know what the rest mean. Not really a clue. Except that
+UTA may have something to do with utilities.
 
 ```{r QC and Explore more}
 
@@ -121,19 +127,17 @@ dfnew %>%
   
 
 ```
+
 ### STREET_NUM
 
 Now it gets messy.
 
 The street numbers have junk in them - sometimes.
 
-4107 B
-606 #3
-1/2
-35 1/2
-13410.
+4107 B 606 #3 1/2 35 1/2 13410.
 
-So we'll try to clean up at least most of this. We'll create two new variables, Street_num and Street_alpha.
+So we'll try to clean up at least most of this. We'll create two new
+variables, Street_num and Street_alpha.
 
 ```{r QC and explore even more}
 
@@ -146,8 +150,9 @@ dfnew %>%
 
 ```
 
-Hmm... some trash in the FRACTION field. Period, square bracket, slash... 
-Sometimes it matches what I have designated Street_alpha, but not always.
+Hmm... some trash in the FRACTION field. Period, square bracket,
+slash... Sometimes it matches what I have designated Street_alpha, but
+not always.
 
 ```{r PREFIX}
 
@@ -164,8 +169,8 @@ dfnew$PREFIX[!is.na(dfnew$PREFIX) & str_detect(dfnew$PREFIX, "[^NSEW]")] <- NA
 
 ```
 
-A few bad entries. the "C" is pulled from the street number so can be deleted.
-The lower case directions can be repaired.
+A few bad entries. the "C" is pulled from the street number so can be
+deleted. The lower case directions can be repaired.
 
 ```{r STREET NAME}
 
@@ -294,7 +299,6 @@ dfnew <- readRDS(paste0(path, "temporary_intermediate_file_1"))
 
 ```
 
-
 ```{r suffixes}
 
 dfnew %>% 
@@ -421,7 +425,6 @@ saveRDS(dfnew, paste0(path, "temporary_intermediate_file_2"))
 
 ```
 
-
 ```{r revisit prefix}
 
 #   Can we grab nearby prefixes to repair missing ones?
@@ -444,13 +447,61 @@ dftest %>% group_by(ZIPCODE, New_street, Street_type) %>%
                 sumS = sum(PREFIX=="S", na.rm=TRUE)) %>%
   mutate(singlet = n-sumNA) %>% 
   filter(!sumNA==n) %>% 
-  filter(sumNA>0) 
+  filter(sumNA>0) %>% 
+  mutate(percentNA = sumNA/n) 
 
+#   Take singlet prefixes with total n>10 and find minimum distance to
+#   a cousin
 
+#   data frame of single occurrence PREFIXes
+df_singles <- tmp %>% 
+  filter(n>10) %>% 
+  filter(singlet==1) %>% 
+  filter(!Street_type == "CIR") %>% # eliminate circles
+  filter(!Street_type == "CT") %>%   # eliminate courts
+  mutate(nearest=NA)
+
+for (i in 1:nrow(df_singles)) {
+  tmp_sing <- dftest %>% filter((ZIPCODE==df_singles[i,]$ZIPCODE) &
+                                (New_street==df_singles[i,]$New_street) & 
+                                (Street_type==df_singles[i,]$Street_type))
+  
+  bad_X <- tmp_sing[!is.na(tmp_sing$PREFIX),]$X_COORD
+  bad_Y <- tmp_sing[!is.na(tmp_sing$PREFIX),]$Y_COORD
+  
+  tmp_sing <- tmp_sing %>% 
+    mutate(dist=sqrt((X_COORD - bad_X)^2 +
+                     (Y_COORD-bad_Y)^2)) %>% 
+    arrange(dist)
+  
+  df_singles[i,]$nearest <- tmp_sing[2,]$dist
+}
+
+#   Let's use a 150 foot cutoff. Further away than that and I'll ignore it.
+
+df_singles <- df_singles %>% filter(nearest<150)
+
+dfnew <- dfnew %>% mutate(Prefix=PREFIX)
+  
+dfnew[(dfnew$New_street %in% df_singles$New_street) &
+  (dfnew$ZIPCODE %in% df_singles$ZIPCODE) &
+  (dfnew$Street_type %in% df_singles$Street_type),] <- NA 
+
+#######   now let's look at NA's that shouldn't be.
+#   This is more complicated since the needed prefix could be E or W say.
+#   About 0.1 for the percent cutoff seems reasonable
+
+#   data frame of candidates
+df_cands <- tmp %>% 
+  filter(n>10) %>% 
+  filter(percentNA<0.1) %>% 
+  filter(!Street_type == "CIR") %>% # eliminate circles
+  filter(!Street_type == "CT") %>%   # eliminate courts
+  mutate(nearest=NA)
+
+#   Expand this out to all the individual points in prep for distance calc
 
 ```
-
-
 
 
 
