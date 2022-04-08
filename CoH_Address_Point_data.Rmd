@@ -556,6 +556,38 @@ For a few points the zipcode is incorrect. For example, 4436 MacGregor is shown
 as in 77004, but actually is in 77021. This ends up giving me an unreasonable
 nearest point.
 
+```{r City}
+
+dfnew$CITY %>% unique() %>% sort()
 
 
+```
 
+City names look okay.
+
+```{r zips}
+
+dfnew$ZIPCODE %>% unique() %>% sort()
+
+```
+
+Zipcodes look okay.
+
+```{r sources}
+
+dfnew$SOURCES %>% unique() %>% sort()
+
+
+```
+
+A little ambiguity between "COH" and "City of Houston", also CP and Centerpoint
+Energy, Center Point, and CE.
+```{r last edit date}
+
+dfnew %>% mutate(date=lubridate::ymd_hms(last_edited_date)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=date))
+
+```
+
+No last edited dates before 2015.
