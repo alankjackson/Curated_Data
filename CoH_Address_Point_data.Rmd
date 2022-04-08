@@ -432,8 +432,8 @@ saveRDS(dfnew, paste0(path, "temporary_intermediate_file_2"))
 #   Let's shrink dataset size
 dftest <- 
 dfnew %>% 
-  select(OBJECTID, Street_num, PREFIX, New_street, Street_type, 
-         ZIPCODE, X_COORD, Y_COORD) 
+  select(OBJECTID, Street_num, Street_alpha, PREFIX, New_street, 
+         Street_type, ZIPCODE, X_COORD, Y_COORD) 
 
 #   Now start analysis by street name, type, and zipcode
 
@@ -485,7 +485,7 @@ dfnew <- dfnew %>% mutate(Prefix=PREFIX)
   
 dfnew[(dfnew$New_street %in% df_singles$New_street) &
   (dfnew$ZIPCODE %in% df_singles$ZIPCODE) &
-  (dfnew$Street_type %in% df_singles$Street_type),] <- NA 
+  (dfnew$Street_type %in% df_singles$Street_type),]$Prefix <- NA 
 
 #######   now let's look at NA's that shouldn't be.
 #   This is more complicated since the needed prefix could be E or W say.
@@ -496,12 +496,66 @@ df_cands <- tmp %>%
   filter(n>10) %>% 
   filter(percentNA<0.1) %>% 
   filter(!Street_type == "CIR") %>% # eliminate circles
-  filter(!Street_type == "CT") %>%   # eliminate courts
-  mutate(nearest=NA)
+  filter(!Street_type == "CT")  # eliminate courts
 
 #   Expand this out to all the individual points in prep for distance calc
+#   Let's shrink dataset size
+dftest <- 
+dfnew %>% 
+  select(OBJECTID, Street_num, Street_alpha, Prefix, New_street, 
+         Street_type, ZIPCODE, X_COORD, Y_COORD) 
+dftest$Nearest <- 0
+dftest$Minimus <- 0
+dftest$Neighbor_object <- NA
+
+for (i in 1:nrow(df_cands)){
+#for (i in 1:3){
+  print(paste(i, "---->", df_cands[i,]$New_street))
+  eraseme <- dftest %>% 
+    filter((ZIPCODE %in% df_cands[i,]$ZIPCODE) &
+           (New_street %in% df_cands[i,]$New_street) &
+           (Street_type %in% df_cands[i,]$Street_type))  
+  
+  targets <- eraseme %>% filter(is.na(Prefix)) %>% 
+    mutate(Prefix=NA,
+           dist=0)
+  
+  for (j in 1:nrow(targets)){
+    foo <-   eraseme %>% 
+    summarize(nearest=sqrt((X_COORD -targets[j,]$X_COORD)^2 +
+                        (Y_COORD-targets[j,]$Y_COORD)^2),
+              prefix=Prefix,
+              object=OBJECTID) %>% 
+      arrange(nearest) %>% 
+      drop_na()
+    
+    dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Prefix <- foo[1,]$prefix
+    dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Nearest <- foo[1,]$nearest
+    dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Neighbor_object <- foo[1,]$object
+    print("--b--")
+  }
+}
+
+dftest %>% filter(Nearest>0,
+                 Nearest<300) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Nearest))
+
+#   150 ft feels like the furthest I can do with confidence.
+
+foo <- dftest %>% filter(Nearest<150,
+                         Nearest>0)
+                   
+dfnew[dfnew$OBJECTID %in% foo$OBJECTID,]$Prefix <- foo$Prefix
 
 ```
+
+##  Updating prefix
+
+For a few points the zipcode is incorrect. For example, 4436 MacGregor is shown
+as in 77004, but actually is in 77021. This ends up giving me an unreasonable
+nearest point.
+
 
 
 
