@@ -13,6 +13,8 @@ library(readxl) # read excel files
 library(lubridate) # handle dates
 #library(RCurl)
 
+savepath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/PollenAndMold/"
+
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -32,7 +34,7 @@ path <- "https://www.houstontx.gov/health/Pollen-Mold/Pollen_Archives/"
 
 url_list <- tribble(~url)
 
-for (yr in as.character(2013:2019)) {
+for (yr in as.character(2013:2021)) {
   for (mon in tolower(month.name)) {
     if (yr=="2013" & mon=="february") {mon <- "febraury"}
     url <- paste0(mon, "_", yr, "_pollen.xls")
@@ -42,7 +44,7 @@ for (yr in as.character(2013:2019)) {
     }
     if(yr=="2018" & mon=="june") {url <- paste0(mon, "_", yr, "_pollen.xls")} 
     if(yr=="2018" & mon=="march") {next} # bad file lurking out there
-    if (!url.exists(paste0(path,url))) {print(paste(url, "does not exist"))
+    if (!RCurl::url.exists(paste0(path,url))) {print(paste(url, "does not exist"))
                             next}
     #   add to url_list
     url_list <- add_row(url_list, url=url)
@@ -51,12 +53,18 @@ for (yr in as.character(2013:2019)) {
 
 #   Read in files using numeric months
 
-for (yr in as.character(2013:2019)) {
+for (yr in as.character(2013:2022)) {
   for (mon in sprintf("%02d", 1:12)) {
     url <- paste0(yr, mon, "-pollen-count.xls")
-    if (grepl("201902", url)) {url <- paste0(url, "x")}
-    if (!url.exists(paste0(path,url))) {print(paste(url, "does not exist"))
-                            next}
+    #if (grepl("201902", url)) {url <- paste0(url, "x")}
+    if (!RCurl::url.exists(paste0(path,url))) {
+      url <- paste0(url, "x") # try xlsx file
+    }
+    if (!RCurl::url.exists(paste0(path,url))) {
+      print(paste(url, "does not exist"))
+      next
+    }
+    
     #   add to url_list
     url_list <- add_row(url_list, url=url)
   }
@@ -69,15 +77,174 @@ for (yr in as.character(2013:2019)) {
 #   First read the urls into local files
 
 for (url in unlist(url_list[,1])){
-  download.file(paste0(path, url), destfile=url, mode="wb")
+  download.file(paste0(path, url), destfile=paste0(savepath, url), mode="wb")
 }
 
 for (url in url_list$url){
   print(url)
-  fileout <- paste0(url,".rds")
-  df2 <- read_excel(url, col_names=FALSE)  
+  fileout <- paste0(savepath, url, ".rds")
+  df2 <- read_excel(paste0(savepath, url), col_names=FALSE)  
   saveRDS(df2, fileout)
 }
+
+```
+
+##    Serious cleanup time
+
+```{r cleanup and consolidate}
+
+keep <- url_list
+
+# Create an output filename column in url_list
+url_list$filename <- NA
+for (i in 1:nrow(url_list)) {
+  url <-  unlist(url_list[i,1])
+  if (grepl("febraury", url)){ # misspelled February case
+    url_list[i,]$filename <- "february_2013"
+  }
+  else if (grepl("^20", url)) { # numeric dates
+    y <- str_sub(url,1,4) # get year
+    m <- str_sub(url,5,6) # get month
+    url_list[i,]$filename <- paste0(tolower(month.name)[as.numeric(m)],
+                                      "_",
+                                      y)
+  }
+  else { # regular alpha dates
+    url_list[i,]$filename <- str_extract(url,"\\w+(?=_pollen)")
+  }
+}
+
+
+# Read in df's from disk
+
+for (i in 1:nrow(url_list)) {
+  filename <- paste0(url_list[i,]$url, ".rds")
+  df <- readRDS(paste0(savepath, filename))
+  dataframe <- paste0("dframe_", url_list[i,]$filename)
+  assign(dataframe, df)
+}
+
+
+clean = function(data) {
+
+  # Recode column names
+  #print(paste("DF", deparse(substitute(data)),sep="="))
+  names.row = grep("DATE", data[, 1][[1]], ignore.case=TRUE)
+  data[names.row, which(is.na(data[names.row,]))] <- 
+    rep("NULL", sum(is.na(data[names.row,]))) # sometimes the variable is NA
+  recode_vals = translate$to %>% set_names(translate$from)
+  old_names = unlist(data[names.row, ][-1]) 
+  names(data) = c("Date", recode(old_names, !!!recode_vals))
+  
+  # Get Month and Year for dates
+  names.col = grep("Month:", data, ignore.case=TRUE)
+  names.row = grep("Month:", data[, names.col, drop=TRUE], ignore.case=TRUE)
+  mon  <- str_remove(data[names.row, names.col], "Month:\\s*|MONTH:\\s*")
+  names.col = grep("Year:", data, ignore.case=TRUE)
+  names.row = grep("Year", data[, names.col, drop=TRUE], ignore.case=TRUE)
+  yr  <- str_remove(data[names.row, names.col], "YEAR:\\s*|Year:\\s*")
+
+  # Remove Month, Year, Date, POLLEN, and Total rows
+  data = data[!grepl("Month|YEAR|DATE|Total|POLLEN", data$Date, ignore.case=TRUE), ]
+  data = data[!is.na(data$Date),]
+  
+  # Change Date column to correct dates
+  data$Date = paste(yr, mon, data$Date, sep="-")
+  data$Date = lubridate::ymd(data$Date)
+  data = data[!is.na(data$Date),] # for things like Feb 31
+  
+  print(data$Date[1])
+  
+  data
+}
+
+# Clean up plant names to be used for variable names
+translate <- tribble(
+  ~from,                        ~to,
+"Ashe Juniper / Bald Cypress",  "Ashe_JuniperOrBald_Cypress", 
+"Alnus(Alder)",                 "Alnus",
+"Black Gum",                    "Black_Gum", 
+"Black Walnut",                 "Black_Walnut", 
+"Cotton Wood",                  "Cotton_Wood",
+"Glandular Mesquite",           "Glandular_Mesquite", 
+"Osage Orange",                 "Osage_Orange", 
+"Sweet Gum",                    "Sweet_Gum", 
+"Gingko Biloba",                "Gingko_Biloba",  
+"Burweed / Marshelder",         "BurweedOrMarshelder", 
+"Dog Fennel",                   "Dog_Fennel", 
+"Lamb's Quarters",              "Lambs_Quarters", 
+"Partridge Pea",                "Partridge_Pea", 
+"Plum Grannet",                 "Plum_Grannet", 
+"WILLOW",                       "Willow", 
+"plantago(plantain)",           "Plantago", 
+"Plantago(Plantain)",           "Plantago", 
+"Plantago(plantain)",           "Plantago", 
+"PLANTAGO",                     "Plantago", 
+"Walnut(juglans)",              "Walnut", 
+"Other weed pollen",            "Other_Weed", 
+"Other weed/unidentified",      "Other_Weed", 
+"other weed pollen",            "Other_Weed", 
+"other weed",                   "Other_Weed", 
+"Other Weed",                   "Other_Weed", 
+"OTHER WEED",                   "Other_Weed", 
+"OTHER TREE",                   "Other_Tree", 
+"Other Tree/Unidentified",      "Other_Tree", 
+"other tree pollen",            "Other_Tree", 
+"OTHER TREE POLLEN",            "Other_Tree", 
+"Other tree pollen",            "Other_Tree", 
+"Other Tree",                   "Other_Tree", 
+"Wild Carrot",                  "Wild_Carrot" 
+)
+
+#  There are some particular issues with certain files, that will need to be
+# cleaned up individually before they can be merged.
+# This is done iteratively by running the function and then responding to
+# errors and warnings
+
+dframe_august_2013[33,1] <- "28" # weird stuff in field
+dframe_february_2015[36,1] <- NA # 31st of Feb?
+dframe_february_2017[34,1] <- NA # 29th of Feb?
+dframe_february_2018[33:35,1] <- NA # 29-31 of Feb
+dframe_november_2014[36,1] <- NA # 31 of Nov
+dframe_november_2015[36,1] <- NA # 31 of Nov
+dframe_november_2016[36,1] <- NA # 31 of Nov
+dframe_november_2017[35,1] <- NA # 31 of Nov
+dframe_november_2018[35,1] <- NA # 31 of Nov
+dframe_september_2015[36,1] <- NA # 31 of Sep
+dframe_september_2016[36,1] <- NA # 31 of Sep
+dframe_september_2017[36,1] <- NA # 31 of Sep
+dframe_september_2018[35,1] <- NA # 31 of Sep
+dframe_march_2015[,9] <- NULL # nothing in column
+dframe_march_2016[,9] <- NULL # nothing in column
+dframe_march_2017[,9] <- NULL # nothing in column
+dframe_may_2018[1,2] <- "Year: 2018" # Missing year
+dframe_may_2018[2,2] <- "Month: MAY" # Missing month
+dframe_september_2018[1,2] <- "Year: 2018" # Missing year
+dframe_september_2018[2,2] <- "Month: SEPTEMBER" # Missing month
+
+frames <- ls(pattern = "dframe")
+df <- NULL
+for (i in 1:length(frames)) {
+  print(paste("===>", i, frames[i]))
+  tmp <- clean(mget(frames[i])[[1]])
+  df <- bind_rows(df, tmp)
+}
+
+#   get rid of weekends & holidays, and then delete the Tech columns
+
+df <- df %>% filter(str_detect(Tech, regex("weekend", ignore_case = TRUE),
+                               negate=TRUE)) %>% 
+             filter(str_detect(Tech, regex("holiday", ignore_case = TRUE),
+                               negate=TRUE)) %>% 
+             filter(str_detect(Tech., regex("weekend", ignore_case = TRUE),
+                               negate=TRUE)) %>% 
+             filter(str_detect(Tech., regex("holiday", ignore_case = TRUE),
+                               negate=TRUE)) %>% 
+  select(-Tech, -Tech.)
+
+df <- df %>% mutate_if(is.character,as.numeric)
+
+#saveRDS(df, "MasterPollenData.rds")
 
 ```
 
