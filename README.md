@@ -150,4 +150,13 @@ CSV file of location and address
 
 Download on 28 Mar 2022
 
+---------------------------
+Pollen and Mold count data for City of Houston
 
+https://www.houstontx.gov/health/Pollen-Mold/pollen-archives.html
+
+Monthly Excel spreadsheets starting in December 2013
+
+Daily for current month requires webscraping
+
+Download 7 April 2022
