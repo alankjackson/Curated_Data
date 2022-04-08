@@ -1,0 +1,83 @@
+---
+title: "Read Pollen Data"
+author: "Alan Jackson"
+date: '2022-04-08'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+#library(stringr) # string tools
+library(readxl) # read excel files
+#library(lettercase) # fiddle with letter case
+library(lubridate) # handle dates
+#library(RCurl)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    Read in the various files. 
+
+Note that the naming changes, there are name errors, and a variety of issues.
+
+
+
+```{r read pollen data}
+
+path <- "https://www.houstontx.gov/health/Pollen-Mold/Pollen_Archives/"
+
+#   Read in files using month names
+
+#   Build a list of valid url's
+
+url_list <- tribble(~url)
+
+for (yr in as.character(2013:2019)) {
+  for (mon in tolower(month.name)) {
+    if (yr=="2013" & mon=="february") {mon <- "febraury"}
+    url <- paste0(mon, "_", yr, "_pollen.xls")
+    if (yr=="2018" | yr=="2019" |
+        (yr=="2017"&(mon=="november"|mon=="december"))) {
+          url <- paste0(mon, "_", yr, "_pollen.xlsx")
+    }
+    if(yr=="2018" & mon=="june") {url <- paste0(mon, "_", yr, "_pollen.xls")} 
+    if(yr=="2018" & mon=="march") {next} # bad file lurking out there
+    if (!url.exists(paste0(path,url))) {print(paste(url, "does not exist"))
+                            next}
+    #   add to url_list
+    url_list <- add_row(url_list, url=url)
+  }
+}
+
+#   Read in files using numeric months
+
+for (yr in as.character(2013:2019)) {
+  for (mon in sprintf("%02d", 1:12)) {
+    url <- paste0(yr, mon, "-pollen-count.xls")
+    if (grepl("201902", url)) {url <- paste0(url, "x")}
+    if (!url.exists(paste0(path,url))) {print(paste(url, "does not exist"))
+                            next}
+    #   add to url_list
+    url_list <- add_row(url_list, url=url)
+  }
+}
+
+####################################
+# now let's read the files and save
+####################################
+
+#   First read the urls into local files
+
+for (url in unlist(url_list[,1])){
+  download.file(paste0(path, url), destfile=url, mode="wb")
+}
+
+for (url in url_list$url){
+  print(url)
+  fileout <- paste0(url,".rds")
+  df2 <- read_excel(url, col_names=FALSE)  
+  saveRDS(df2, fileout)
+}
+
+```
+
