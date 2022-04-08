@@ -591,3 +591,21 @@ dfnew %>% mutate(date=lubridate::ymd_hms(last_edited_date)) %>%
 ```
 
 No last edited dates before 2015.
+
+
+```{r save stuff}
+
+#   Complete file after cleanup
+saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
+
+#   File suitable for using in geocoding
+
+dfnew <- dfnew %>% select(Street_num, Street_alpha, Prefix, New_street, 
+                          Street_type, City=CITY, Zipcode=ZIPCODE,
+                          Lat=Y, Lon=X, X=X_COORD, Y=Y_COORD, OBJECTID
+                          )
+
+saveRDS(dfnew, paste0(path, "COH_Geocoding_Locations.rds"))
+
+```
+
