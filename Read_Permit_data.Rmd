@@ -1,0 +1,147 @@
+---
+title: "Read City Permit Data"
+author: "Alan Jackson"
+date: '2022-04-09'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Permits/"
+
+url_begin <- "https://www.houstontx.gov/planning/DevelopRegs/docs_pdfs/Permit_eReport/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    Step 1 Read in the files
+
+Some sample names:
+
+2022/Web-eReport-04-04-22.docx
+2021/Web-eReport-12.27.21.docx
+2021/Web%20eReport%20100421.docx
+2020/Web%20eReport%2009142020.docx
+2020/Jan27_2020.docx
+2020/0224.docx
+2020/3_23_report.docx
+2019/Jun24_2019.docx
+2019/June17_2019.docx
+2019/June3_June10_epermitreport.docx
+2019/Apr08_2019.docx
+2019/Apr1_2019.docx
+2018/oct8.2018.docx
+2018/october1.2018.docx
+
+Naah, this is a nightmare. I'll just take the webpage and edit it by hand to 
+create a list of files to download.
+
+replace blanks with %20, and trim up to the year folder. Where it exists. 
+
+
+```{r read}
+
+#   Read in list of files and read them in
+
+filenames <- read_csv(paste0(savepath, "URLs.txt"))
+
+for (filename in filenames$Filenames) { # read files in and save them
+  print(paste("Read file", filename))
+  if (str_detect(filename, "^#")) {next} # bad file, commented out
+  outname <- str_remove(filename, "/|\\s")
+  print(paste("Output", outname))
+  download.file(paste0(url_begin, filename), destfile=paste0(savepath, outname), mode="wb")
+}
+
+#   Now let's start trying to tear them apart, Note that there are a handful of excel
+#   spreadsheets in and amongst the docx tables. And one doc file and one pdf. Gaaa...
+#   And some are corrupt. I'll mark those in the input file of names.
+
+for (filename in filenames$Filenames) { # read files in and extract
+  if (str_detect(filename, "^#")) {next} # bad file, commented out
+  filename <- str_replace(filename,"doc$", "docx") # I reformatted the doc file
+  filename <- str_replace(filename,"pdf$", "docx") # I reformatted the pdf file
+  outname <- str_remove(filename, "/|\\s")
+  print(paste("Input", outname))
+  fileout <- paste0(savepath, outname, ".rds")
+  
+  if (str_detect(outname, "xlsx")) { # Oh for God's sake, some are excel????
+      tmp <- readxl::read_excel(paste0(savepath, outname), col_names=FALSE)  
+      tmp <- tmp[-c(1,4),] 
+      tmp <- tmp[,1:6] 
+      names(tmp) <- c("Zipcode", "Permit_date", "Permit_type", "Project_no", 
+                    "Address", "Comments")
+      tmp <- tmp %>% mutate(Permit_date = 
+                              as.Date(as.numeric(Permit_date), 
+                                      origin = "1899-12-30"))
+      saveRDS(tmp, fileout)
+  } else if (str_detect(outname, "2019Sep23_2019.docx")) {# converted to docx with google from pdf
+    report <- docxtractr::read_docx(paste0(savepath, outname))
+    tables <- docxtractr::docx_extract_all_tbls(report)
+    tmp <- bind_rows(tables[2:22])
+    tmp <- tmp[-c(1),] 
+    names(tmp) <- c("Zipcode", "Permit_date", "Permit_type", "Project_no", 
+                    "Address", "Comments")
+    saveRDS(tmp, fileout)
+    
+  } else {
+    if (outname == "2019May6_2019.docx") {next} # table missing, tab delimited
+    report <- docxtractr::read_docx(paste0(savepath, outname))
+    tables <- docxtractr::docx_extract_all_tbls(report)
+    if (length(tables[[1]])>=6){
+      tmp <- tables[[1]]
+    } else {
+      tmp <- tables[[2]]
+    }
+    tmp <- tmp[-c(1,2),] 
+    tmp <- tmp[,1:6] 
+    names(tmp) <- c("Zipcode", "Permit_date", "Permit_type", "Project_no", 
+                    "Address", "Comments")
+    saveRDS(tmp, fileout)
+    
+  }
+}
+
+
+```
+
+
+##    Combine
+
+Hopefully the individual files are all compatible now and combing them will be
+a simple task.
+
+```{r combo}
+
+df <- NULL
+
+for (filename in filenames$Filenames) { # read files in and extract
+  if (str_detect(filename, "^#")) {next} # bad file, commented out
+  filename <- str_replace(filename,"doc$", "docx") # I reformatted the doc file
+  filename <- str_replace(filename,"pdf$", "docx") # I reformatted the pdf file
+  outname <- str_remove(filename, "/|\\s")
+  print(paste("Input", outname))
+  fileout <- paste0(savepath, outname, ".rds")
+  if (outname == "2019May6_2019.docx") {next} # table missing, tab delimited
+  #-------------------  now try combining
+  
+  foo <- readRDS(fileout)
+  foo$Permit_date <- lubridate::as_date(foo$Permit_date)
+  df <- bind_rows(df, foo)
+}
+
+df <- df[!df$Zipcode=="",]  # eliminate blank lines
+df <- df[!is.na(df$Permit_date),] # eliminate nearly blank lines
+df <- df[!df$Zipcode=="Zip Code",]
+
+df[str_detect(df$Project_no, "HYPER"),]$Project_no <- "19046263"
+
+```
+
+
+
+
+
+
+
