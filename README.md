@@ -160,3 +160,21 @@ Monthly Excel spreadsheets starting in December 2013
 Daily for current month requires webscraping
 
 Download 7 April 2022
+
+---------------------------
+Permit data from the city of Houston
+
+https://www.houstontx.gov/planning/DevelopRegs/dev_reports.html
+
+Weekly docx files with a table in each file
+
+Download 8 April 2022
+
+
+
+
+
+
+
+
+
