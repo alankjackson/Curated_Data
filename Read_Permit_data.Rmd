@@ -137,6 +137,8 @@ df <- df[!df$Zipcode=="Zip Code",]
 
 df[str_detect(df$Project_no, "HYPER"),]$Project_no <- "19046263"
 
+
+saveRDS(df, paste0(savepath, "Permit_data.rds"))
 ```
 
 
