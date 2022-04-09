@@ -233,18 +233,109 @@ for (i in 1:length(frames)) {
 #   get rid of weekends & holidays, and then delete the Tech columns
 
 df <- df %>% filter(str_detect(Tech, regex("weekend", ignore_case = TRUE),
-                               negate=TRUE)) %>% 
+                               negate=TRUE) %>% replace_na(TRUE)) %>% 
              filter(str_detect(Tech, regex("holiday", ignore_case = TRUE),
-                               negate=TRUE)) %>% 
+                               negate=TRUE) %>% replace_na(TRUE)) %>% 
              filter(str_detect(Tech., regex("weekend", ignore_case = TRUE),
-                               negate=TRUE)) %>% 
+                               negate=TRUE) %>% replace_na(TRUE)) %>% 
              filter(str_detect(Tech., regex("holiday", ignore_case = TRUE),
-                               negate=TRUE)) %>% 
+                               negate=TRUE) %>% replace_na(TRUE)) %>% 
   select(-Tech, -Tech.)
 
 df <- df %>% mutate_if(is.character,as.numeric)
 
-#saveRDS(df, "MasterPollenData.rds")
+df$BalDCypress <- NULL # nothing to see here
+
+saveRDS(df, paste0(savepath, "MasterPollenData.rds"))
+
+```
+
+##  Quick peek
+
+```{r}
+oak <- df %>% select(Date, Oak) %>% 
+  arrange(Date) %>% 
+  replace_na(list(Oak = 0)) %>% 
+  mutate(Oak=ifelse(wday(Date)==1, NA, Oak),
+         Oak=ifelse(wday(Date)==7, NA, Oak))
+
+
+oak %>% 
+  ggplot(aes(x=Date, y=Oak)) +
+  geom_point() +
+  geom_line()
+
+# Plot missing values by day of week
+
+
+df %>% select(Date, Oak) %>% 
+  arrange(Date) %>% 
+  mutate(dow=wday(Date)) %>% 
+  group_by(dow) %>% 
+  summarise_all(~sum(is.na(.))) %>%  
+  #mutate(nacount=nacount-min(nacount)) %>% 
+  ggplot(aes(x=dow, y=Oak)) +
+  geom_bar(stat="identity")
+
+  
+# Impute missing values
+
+oakts <- ts(oak)
+oakts <- imputeTS::na_kalman(oakts)
+
+oakts %>% timetk::tk_tbl() %>% 
+  mutate(Date=as_date(Date)) %>% 
+  ggplot(aes(x=Date, y=Oak)) +
+  geom_line() +
+  labs(title="Oak Pollen Measurements from City of Houston",
+       x="Date",
+       y="Measurement")
+
+```
+
+```{r now}
+
+# Read in some hand-acquired data and add it in
+
+dfnew <- read_csv(paste0(savepath, "foo.crv"))
+
+dfnew <- dfnew %>% pivot_wider(names_from = Tree, values_from = Data)
+
+dfnew <- bind_rows(dfnew, df)
+
+# Impute missing values
+
+oak <- dfnew %>% select(Date, Oak) %>% 
+  arrange(Date) %>% 
+  replace_na(list(Oak = 0)) %>% 
+  mutate(Oak=ifelse(wday(Date)==1, NA, Oak),
+         Oak=ifelse(wday(Date)==7, NA, Oak))
+
+
+oakts <- ts(oak)
+oakts <- imputeTS::na_kalman(oakts)
+
+oakts %>% timetk::tk_tbl() %>% 
+  mutate(Date=as_date(Date)) %>% 
+  ggplot(aes(x=Date, y=Oak)) +
+  geom_line() +
+  labs(title="Oak Pollen Measurements from City of Houston",
+       x="Date",
+       y="Measurement")
+
+oakts %>% timetk::tk_tbl() %>% 
+  mutate(Date=as_date(Date)) %>% 
+  mutate(Year=factor(year(Date))) %>% 
+  mutate(Mdate=as.Date(paste0("2012-", format(Date, "%j")), "%Y-%j")) %>% 
+  filter((Mdate>"2012-02-01") &
+         (Mdate<"2012-05-01")) %>% 
+  ggplot(aes(x=Mdate, y=Oak, color=Year)) +
+  geom_point()+
+  geom_line() +
+  labs(title="Houston Oak Pollen History",
+       x="Day of Year",
+       y="Grains per cubic meter")
+
 
 ```
 
