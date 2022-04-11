@@ -289,6 +289,17 @@ dfnew[dfnew$OBJECTID %in% tmp2$bad_id,]$New_street <- tmp2$STREET_NAME
 dfnew[dfnew$OBJECTID %in% tmp3$bad_id,]$New_street <- tmp3$STREET_NAME 
 dfnew[dfnew$OBJECTID %in% tmp4$bad_id,]$New_street <- tmp4$STREET_NAME 
 
+##########    Now fix a few specific problems that appear
+
+dfnew[dfnew$New_street=="H M C",]$New_street <- "H MARK CROSSWELL JR"
+dfnew[dfnew$New_street=="2136TH F M 2920",]$New_street <- "FM 2920"
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^F M ", "FM "))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^F.M. ", "FM "))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^JOHN A", "JOHN-A"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^AVE ", "AVENUE "))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^H R$", "H AND R"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^T K C$", "TKC"))
+
 saveRDS(dfnew, paste0(path, "temporary_intermediate_file_1"))
 
 ```
@@ -581,12 +592,17 @@ dfnew$SOURCES %>% unique() %>% sort()
 ```
 
 A little ambiguity between "COH" and "City of Houston", also CP and Centerpoint
-Energy, Center Point, and CE.
+Energy, Center Point, and CE. And some other miscellaneous cleanup.
 ```{r last edit date}
 
 dfnew %>% mutate(date=lubridate::ymd_hms(last_edited_date)) %>% 
   ggplot() +
   geom_histogram(aes(x=date))
+
+dfnew$Street_num <- as.character(dfnew$Street_num)
+dfnew <- dfnew %>% replace_na(list(Prefix="", Street_type=""))
+dfnew <- dfnew %>% rename(Street_name=New_street)
+dfnew <- dfnew %>% mutate(City=str_to_upper(City))
 
 ```
 
