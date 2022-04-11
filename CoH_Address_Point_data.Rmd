@@ -543,7 +543,7 @@ for (i in 1:nrow(df_cands)){
     dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Prefix <- foo[1,]$prefix
     dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Nearest <- foo[1,]$nearest
     dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Neighbor_object <- foo[1,]$object
-    print("--b--")
+    #print("--b--")
   }
 }
 
@@ -602,7 +602,7 @@ dfnew %>% mutate(date=lubridate::ymd_hms(last_edited_date)) %>%
 dfnew$Street_num <- as.character(dfnew$Street_num)
 dfnew <- dfnew %>% replace_na(list(Prefix="", Street_type=""))
 dfnew <- dfnew %>% rename(Street_name=New_street)
-dfnew <- dfnew %>% mutate(City=str_to_upper(City))
+dfnew <- dfnew %>% mutate(CITY=str_to_upper(CITY))
 
 ```
 
@@ -616,7 +616,7 @@ saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
 
 #   File suitable for using in geocoding
 
-dfnew <- dfnew %>% select(Street_num, Street_alpha, Prefix, New_street, 
+dfnew <- dfnew %>% select(Street_num, Street_alpha, Prefix, Street_name, 
                           Street_type, City=CITY, Zipcode=ZIPCODE,
                           Lat=Y, Lon=X, X=X_COORD, Y=Y_COORD, OBJECTID
                           )
