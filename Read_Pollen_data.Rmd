@@ -253,6 +253,9 @@ saveRDS(df, paste0(savepath, "MasterPollenData.rds"))
 ##  Quick peek
 
 ```{r}
+
+df <- readRDS(paste0(savepath, "MasterPollenData.rds"))
+
 oak <- df %>% select(Date, Oak) %>% 
   arrange(Date) %>% 
   replace_na(list(Oak = 0)) %>% 
@@ -335,6 +338,29 @@ oakts %>% timetk::tk_tbl() %>%
   labs(title="Houston Oak Pollen History",
        x="Day of Year",
        y="Grains per cubic meter")
+
+tmp <- 
+oakts %>% timetk::tk_tbl() %>% 
+  mutate(Date=as_date(Date)) %>% 
+  mutate(Year=factor(year(Date))) %>% 
+  mutate(Mdate=as.Date(paste0("2012-", format(Date, "%j")), "%Y-%j")) %>% 
+  #mutate(Oak=ifelse(Oak<100, NA, Oak)) #%>% 
+  group_by(Year) %>% 
+    summarize(Pollen_Volume=sum(Oak, na.rm = TRUE),
+              Max_reading=max(Oak, na.rm = TRUE),
+              Days=sum(Oak>100))
+
+tmp2 <- tmp %>% 
+  pivot_longer(!Year, names_to="Variable", values_to = "Value")
+
+tmp2 %>% mutate(Year=as.numeric(as.character(Year))) %>%  
+  ggplot(aes(x=Year, y=Value )) +
+  geom_point() + 
+  geom_line() + 
+  facet_wrap(~Variable, scales="free_y", ncol=1) +
+  scale_x_continuous(breaks=c(2013:2022))+
+  labs(title="Oak Pollen History in Houston")
+
 
 
 ```
