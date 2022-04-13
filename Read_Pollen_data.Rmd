@@ -361,7 +361,15 @@ tmp2 %>% mutate(Year=as.numeric(as.character(Year))) %>%
   scale_x_continuous(breaks=c(2013:2022))+
   labs(title="Oak Pollen History in Houston")
 
+tmp %>% filter(as.integer(Year)<10) %>% 
+  ggplot(aes(x=Pollen_Volume, y=Days)) +
+  geom_point() +
+  geom_smooth(method='lm')
 
+tmp %>% filter(as.integer(Year)<10) %>% 
+  ggplot(aes(x=Max_reading, y=Days)) +
+  geom_point() +
+  geom_smooth(method='lm')
 
 ```
 
