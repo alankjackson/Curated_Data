@@ -30,7 +30,7 @@ folder <- paste0("/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Zipcodes/"
 filename <- "ACS_2019_5YR_ZCTA.gdb"
 
 censuslayers <- sf::st_layers(paste0(folder, filename))
-
+######################   stopped here. File is really huge.....
 layername <- "ACS_2016_5YR_ZCTA"
 
 ZCTApolys <- st_read(paste0(folder, filename), layer = layername) %>%
