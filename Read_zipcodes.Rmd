@@ -1,0 +1,62 @@
+---
+title: "Zipcodes"
+author: "Alan Jackson"
+date: '2022-04-13'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##        Zipcodes
+
+First source is the census bureau
+
+https://www2.census.gov/geo/tiger/TIGER_DP/2019ACS/
+
+filename: ACS_2019_5YR_ZCTA.gdb.zip
+
+```{r census zipcodes}
+
+# lat, long, lat, long
+HoustonBounds <- c(30.00, -95.57, 29.60, -95.13)
+
+folder <- paste0("/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Zipcodes/")
+filename <- "ACS_2019_5YR_ZCTA.gdb"
+
+censuslayers <- sf::st_layers(paste0(folder, filename))
+
+layername <- "ACS_2016_5YR_ZCTA"
+
+ZCTApolys <- st_read(paste0(folder, filename), layer = layername) %>%
+  select(-c(GEOID10, CLASSFP10, MTFCC10, FUNCSTAT10))
+
+ZCTApolys <- st_transform(ZCTApolys, 4326) # reproject to Google epsg code
+
+#   Map a subset to see how they look
+gmap = get_map(location=c(-95.4142, 29.7907), source="google",zoom=10)
+
+HoustonBounds <- c(30.00, -95.57, 29.60, -95.13)
+ggmap(gmap, extent='normal', maprange=FALSE, show.legend=FALSE) +
+  geom_sf(data=ZCTApolys, mapping=aes(Zip_Code="blue"),fill=NA, inherit.aes=FALSE, show.legend=FALSE) +
+  coord_sf(xlim=c(-95.6, -95.2), ylim=c(29.6, 29.9)) 
+
+
+  saveRDS(ZCTApolys, file = "~/Dropbox/Rprojects/CensusDataframe/ZCTA_polygons_2016.rds")
+
+
+
+
+```
+
+##        COH zipcode data
+
+Download the shape file from 
+https://cohgis-mycity.opendata.arcgis.com/datasets/coh-zipcode/explore?location=29.761150%2C-95.394800%2C9.16
+
+
+
