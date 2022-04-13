@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 
+path="/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Zipcodes/"
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -58,5 +59,22 @@ ggmap(gmap, extent='normal', maprange=FALSE, show.legend=FALSE) +
 Download the shape file from 
 https://cohgis-mycity.opendata.arcgis.com/datasets/coh-zipcode/explore?location=29.761150%2C-95.394800%2C9.16
 
+filename: COH_ZIPCODE.zip
 
+```{r City data}
+
+#   Read in the shapefiles
+
+Zip_polys <- sf::read_sf(paste0(path,"COH_ZIPCODE.shp"))
+
+summary(Zip_polys)
+
+#   CRS is good, we have polys, I think I'm happy. Let's plot them
+
+plot(Zip_polys)
+
+saveRDS(Zip_polys, paste0(path, "COH_Zip_Polys.rds"))
+
+
+```
 
