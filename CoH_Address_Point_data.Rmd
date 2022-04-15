@@ -20,6 +20,7 @@ filename <- "COH_PDD_ADDRESS_POINTS_-_PDD.csv"
 df <- read_csv(paste0(path, filename),
                col_types="nnccccccccccccccnnccccccccccccccc")
 
+corrections <- NULL # collect what has been changed
 ```
 
 ## Quality control and Explore
@@ -111,12 +112,23 @@ dfnew <- df %>%
   mutate(STREET_NUM = str_remove(STREET_NUM, "[^0-9A-Z#/\\s]")) %>% 
   mutate(Street_alpha = str_trim(str_remove(STREET_NUM, "^\\d+")))  
 
+corrections <- df %>% 
+  filter(str_detect(STREET_NUM, "^[1-2]+/+[1-9]+") |
+         str_detect(STREET_NUM, "[^0-9A-Z#/\\s]")) %>%  
+  mutate(change="Extraneous stuff in STREET_NUM")
+
 dfnew %>% 
   filter(Street_alpha!="") %>% 
   ggplot() +
   geom_histogram(aes(x=Street_alpha), stat="count", na.rm=TRUE) +
   coord_flip() 
   
+tmp <-   dfnew %>% 
+  mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
+  filter(Street_num>49999) %>% 
+  mutate(change="STREET_NUM > 49999, which fails in spot checks") %>% 
+  select(-Street_num, -Street_alpha)
+corrections <- bind_rows(corrections, tmp)
 dfnew <- dfnew %>% 
   mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
   filter(Street_num<49999)  
@@ -161,6 +173,12 @@ dfnew %>%
   select(PREFIX) %>% 
   unique
 
+tmp <- dfnew %>% 
+  filter(str_detect(PREFIX, "[a-z]|[^NSEW]")) %>% 
+  mutate(change="PREFIX not one of N,S,E,W") %>% 
+  select(-Street_num, -Street_alpha)
+corrections <- bind_rows(corrections, tmp)
+
 dfnew <- 
 dfnew %>% 
   mutate(PREFIX=str_to_upper(PREFIX))
@@ -171,6 +189,17 @@ dfnew$PREFIX[!is.na(dfnew$PREFIX) & str_detect(dfnew$PREFIX, "[^NSEW]")] <- NA
 
 A few bad entries. the "C" is pulled from the street number so can be
 deleted. The lower case directions can be repaired.
+
+
+##        Street Names
+
+Look at low occurrence names. 
+- names that occur only once
+  - update names that are < 1060 ft from a 1 char change in 3 names in the zip
+  - then 2 character changes < 300 feet with >= 5 names in zip
+  - then 3 character changes < 300 feet with >= 9 names in zip
+- names that occur twice
+  - update names that are < 500 ft from a 1 char change in 8 names in the zip
 
 ```{r STREET NAME}
 
@@ -262,9 +291,17 @@ tmp <- get_corrections(df_singles, dftest, 1, 1060, 3)
 
 df_singles <- df_singles[!df_singles$OBJECTID %in% tmp$bad_id,]
 tmp[duplicated(tmp$bad_id),]
+#     Get rid of duplicates
 tmp <- tmp %>% filter(!STREET_NAME=="INTERCONTINENT",
                       !STREET_NAME=="MARY")
 
+foo <- df[df$OBJECTID %in% tmp$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp[OBJECTID %in% tmp$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+
+#   Singles with 2 letter changes
 tmp2 <- get_corrections(df_singles, dftest, 2, 300, 5)
 
 df_singles <- df_singles[!df_singles$OBJECTID %in% tmp2$bad_id,]
@@ -272,13 +309,33 @@ df_singles <- df_singles %>% filter(!OBJECTID=="76158") %>%
                              filter(!OBJECTID=="705381")
 tmp2[duplicated(tmp2$bad_id),]
 
+foo <- df[df$OBJECTID %in% tmp2$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp2[OBJECTID %in% tmp2$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+
+#   Singles with 3 letter changes
 tmp3 <- get_corrections(df_singles, dftest, 3, 300, 9)
 tmp3[duplicated(tmp3$bad_id),]
+
+foo <- df[df$OBJECTID %in% tmp3$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp3[OBJECTID %in% tmp3$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
     
 #------   Now do doubles
 
 tmp4 <- get_corrections(df_doubles, dftest, 1, 500, 8)
 tmp4[duplicated(tmp4$bad_id),]
+
+foo <- df[df$OBJECTID %in% tmp4$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp4[OBJECTID %in% tmp4$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+    
 
 #------ Now update the original by adding a new field
 
@@ -291,16 +348,30 @@ dfnew[dfnew$OBJECTID %in% tmp4$bad_id,]$New_street <- tmp4$STREET_NAME
 
 ##########    Now fix a few specific problems that appear
 
+Old_street <- c("H M C", "^F M ", "^F.M. ",
+                "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$")
+New_street <- c("H MARK CROSSWELL JR", "FM ", "FM ", 
+                "JOHN-A", "AVENUE ", "H AND R", "TKC")
+
 dfnew[dfnew$New_street=="H M C",]$New_street <- "H MARK CROSSWELL JR"
 dfnew[dfnew$New_street=="2136TH F M 2920",]$New_street <- "FM 2920"
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^F M ", "FM "))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^F.M. ", "FM "))
-dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^JOHN A", "JOHN-A"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^JOHN A$", "JOHN-A"))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^AVE ", "AVENUE "))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^H R$", "H AND R"))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^T K C$", "TKC"))
 
+ObjID <- df %>% filter(str_detect(STREET_NAME, 
+                                  paste(Old_street, collapse="|")))  
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change=paste("Corrected street name to", 
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$New_street)) 
+corrections <- bind_rows(corrections, foo)
+
 saveRDS(dfnew, paste0(path, "temporary_intermediate_file_1"))
+saveRDS(corrections, paste0(path, "corrections.Rds"))
 
 ```
 
@@ -317,11 +388,17 @@ dfnew %>%
   select(SUFFIX) %>% 
   unique
 
+foo <- df[!is.na(df$SUFFIX) & str_detect(df$SUFFIX, "[^NSEW]"),] %>% 
+  mutate(change="Corrected SUFFIX by deleting bogus value")
+
+corrections <- bind_rows(corrections, foo)
+
 dfnew$SUFFIX[!is.na(dfnew$SUFFIX) & str_detect(dfnew$SUFFIX, "[^NSEW]")] <- NA
 
 ```
 
 ```{r street type}
+
 
 dfnew %>% 
   filter(STREET_TYPE!="") %>% 
@@ -372,6 +449,12 @@ Street_types %>% filter(!is.na(STREET_TYPE)) %>%
 #   type, so I'll leave that one alone. The rest I can update to the correct
 #   value.
 
+foo <- df %>% 
+  filter(str_detect(STREET_TYPE, "^PKY$|^ROAD$|^LANE$|^TWY$")) %>% 
+  mutate(change="Corrected STREET_TYPE to standard USPS values (except SPWY)")
+
+corrections <- bind_rows(corrections, foo)
+
 dfnew <- dfnew %>% 
   mutate(STREET_TYPE=str_replace(STREET_TYPE, "^PKY$", "PKWY")) %>% 
   mutate(STREET_TYPE=str_replace(STREET_TYPE, "^ROAD$", "RD")) %>% 
@@ -413,6 +496,13 @@ for (i in 1:nrow(tmp_rm_not_na)){
   dfnew$Street_type[(dfnew$ZIPCODE==tmp_rm_not_na[[i,1]]) & 
           (dfnew$STREET_NAME==tmp_rm_not_na[[i,2]])] <- NA
 }
+
+ObjID <- dfnew %>% filter(!is.na(STREET_TYPE),
+                 is.na(Street_type))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Removed STREET_TYPE") 
+corrections <- bind_rows(corrections, foo)
   
 # Now let's fix things that are NA but shouldn't be
 
@@ -431,13 +521,30 @@ for (i in 1:nrow(tmp_rm_na)){
           (dfnew$STREET_NAME==tmp_rm_na[[i,2]])] <- tmp_rm_na[[i,5]]
 }
   
-saveRDS(dfnew, paste0(path, "temporary_intermediate_file_2"))
+ObjID <- dfnew %>% filter(is.na(STREET_TYPE),
+                 !is.na(Street_type))   
 
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change=paste("Added STREET_TYPE of", 
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Street_type)) 
+corrections <- bind_rows(corrections, foo)
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_2"))
+saveRDS(corrections, paste0(path, "corrections_2.Rds"))
 
 ```
 
+##  Prefix redux
+
+Many prefixes are missing. We will try to use nearby address points to fill in
+the Prefix where it seems safe to do so.
+
+
+
 ```{r revisit prefix}
 
+
+##-----------------------------   stop here
 #   Can we grab nearby prefixes to repair missing ones?
 
 #   Let's shrink dataset size
