@@ -543,8 +543,6 @@ the Prefix where it seems safe to do so.
 
 ```{r revisit prefix}
 
-
-##-----------------------------   stop here
 #   Can we grab nearby prefixes to repair missing ones?
 
 #   Let's shrink dataset size
@@ -601,9 +599,19 @@ df_singles <- df_singles %>% filter(nearest<150)
 
 dfnew <- dfnew %>% mutate(Prefix=PREFIX)
   
-dfnew[(dfnew$New_street %in% df_singles$New_street) &
-  (dfnew$ZIPCODE %in% df_singles$ZIPCODE) &
-  (dfnew$Street_type %in% df_singles$Street_type),]$Prefix <- NA 
+for (i in 1:nrow(df_singles)){
+  dfnew[(dfnew$New_street %in% df_singles[i,]$New_street) &
+        (!is.na(dfnew$PREFIX)) &
+        (dfnew$ZIPCODE %in% df_singles[i,]$ZIPCODE) &
+        (dfnew$Street_type %in% df_singles[i,]$Street_type),]$Prefix <- NA
+}
+
+ObjID <- dfnew %>% filter(!is.na(PREFIX), # who did we change?
+                 is.na(Prefix))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Removed PREFIX") 
+corrections <- bind_rows(corrections, foo)
 
 #######   now let's look at NA's that shouldn't be.
 #   This is more complicated since the needed prefix could be E or W say.
@@ -666,13 +674,17 @@ foo <- dftest %>% filter(Nearest<150,
                    
 dfnew[dfnew$OBJECTID %in% foo$OBJECTID,]$Prefix <- foo$Prefix
 
+ObjID <- dfnew %>% filter(is.na(PREFIX), # who did we change?
+                          !is.na(Prefix))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Added PREFIX based on neighbors") 
+corrections <- bind_rows(corrections, foo)
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_3"))
+saveRDS(corrections, paste0(path, "corrections_3.Rds"))
 ```
 
-##  Updating prefix
-
-For a few points the zipcode is incorrect. For example, 4436 MacGregor is shown
-as in 77004, but actually is in 77021. This ends up giving me an unreasonable
-nearest point.
 
 ```{r City}
 
@@ -714,6 +726,62 @@ dfnew <- dfnew %>% mutate(CITY=str_to_upper(CITY))
 ```
 
 No last edited dates before 2015.
+
+```{r}
+
+##-----------------------------   stop here
+#   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
+#   There are Y values missing...
+googlecrs <- 4326
+dftest <- 
+dfnew %>% 
+  #head(10) %>% 
+  select(OBJECTID, STREET_NAME, Street_num, ZIPCODE, X, Y, X_COORD, Y_COORD) %>% 
+  #select(OBJECTID, STREET_NAME, Street_num, ZIPCODE, X_COORD, Y_COORD)# %>% 
+  sf::st_as_sf(., coords=c("X", "Y"))
+
+sf::st_crs(dftest) <- googlecrs
+
+foo <- sf::st_transform(dftest, crs="EPSG:2278")
+
+#foo <- 
+foo %>% 
+  mutate(xy=sf::st_coordinates(foo))
+
+foo2 <- sf::st_coordinates(foo)
+foo$X <- foo2[,1]
+foo$Y <- foo2[,2]
+
+foo %>% mutate(Dx=X_COORD-X,
+               Dy=Y_COORD-Y) %>% 
+  filter(Dy>-5) %>% 
+  filter(Dy<0) %>% 
+  ggplot(aes(x=Dy)) +
+  geom_histogram()
+
+foo %>% mutate(Dx=X_COORD-X,
+               Dy=Y_COORD-Y) %>% 
+  filter(Dx>0) %>% 
+  filter(Dx<5) %>% 
+  ggplot(aes(x=Dx)) +
+  geom_histogram()
+
+#     Looks good enough. Let's recover the data with bogus Y coordinates.
+
+ObjID <- dfnew %>% 
+  filter(Y_COORD<13000000) # pull out records with bad Y coordinate
+
+foo[foo$OBJECTID %in% ObjID$OBJECTID,]
+
+dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Y_COORD <- 
+  unname(foo[foo$OBJECTID %in% ObjID$OBJECTID,]$Y)
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Repaired Y_COORD by reprojecting") 
+corrections <- bind_rows(corrections, foo)
+
+
+```
 
 
 ```{r save stuff}
