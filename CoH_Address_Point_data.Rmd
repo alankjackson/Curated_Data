@@ -1145,39 +1145,23 @@ dfnew %>%
             Prefix=last(Prefix),
             Street_name=last(Street_name),
             Street_type=last(Street_type),
-            City=last(City),
+            City=last(CITY),
             Zipcode=last(Zipcode),
-            Lat=mean(Lat),
-            Lon=mean(Lon),
-            Xstd=sd(X),
-            Ystd=sd(Y),
-            X=mean(X),
-            Y=mean(Y),
+            Lat=mean(Y),
+            Lon=mean(X),
+            Xstd=sd(X_COORD),
+            Ystd=sd(Y_COORD),
+            X_COORD=mean(X_COORD),
+            Y_COORD=mean(Y_COORD),
             OBJECTID=last(OBJECTID)
             ) %>% 
   select(Street_num, Prefix, Street_name, Street_type, City, Zipcode,
-         n, Lat, Lon, Xstd, Ystd, X, Y, OBJECTID)  
+         n, Lat, Lon, Xstd, Ystd, X=X_COORD, Y=Y_COORD, OBJECTID)  
 
-
-
-
-
-```
-
-
-```{r save stuff}
-
-#   Complete file after cleanup
-saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
 
 #   File suitable for using in geocoding
 
-dfnew <- dfnew %>% select(Street_num, Street_alpha, Prefix, Street_name, 
-                          Street_type, City=CITY, Zipcode=ZIPCODE,
-                          Lat=Y, Lon=X, X=X_COORD, Y=Y_COORD, OBJECTID
-                          )
-
 saveRDS(dfnew, paste0(path, "COH_Geocoding_Locations.rds"))
 
-```
 
+```
