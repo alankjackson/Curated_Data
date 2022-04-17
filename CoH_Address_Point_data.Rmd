@@ -15,6 +15,7 @@ library(tidyverse)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/CoH_Address_Points/"
 
+googlecrs <- 4326
 filename <- "COH_PDD_ADDRESS_POINTS_-_PDD.csv"
 
 df <- read_csv(paste0(path, filename),
@@ -730,7 +731,6 @@ No last edited dates before 2015.
 ```{r}
 #   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
 #   There are Y values missing...
-googlecrs <- 4326
 dftest <- 
 dfnew %>% 
   #head(10) %>% 
@@ -955,12 +955,54 @@ dfnew %>% #head(20000) %>%
   filter(n>1)
 
 #   Still needs work, but fixing more prefixes should help.
+#   Safety save
 
-##-----------------------------   stop here
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_5"))
+saveRDS(corrections, paste0(path, "corrections_5.Rds"))
+
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_5"))
+corrections <- readRDS(paste0(path, "corrections_5.Rds"))
+
 ```
 
 ```{r more prefixes}
 
+dfnew <- dfnew %>% 
+  mutate(Zipcode=ZIPCODE)  
+  
+df_prefix <- dfnew %>% 
+  group_by(Zipcode, Street_name, Street_type) %>% 
+    summarize(n=n(),
+              sumNA = sum(Prefix==""),
+              sumE = sum(Prefix=="E", na.rm=TRUE),
+              sumW = sum(Prefix=="W", na.rm=TRUE),
+              sumN = sum(Prefix=="N", na.rm=TRUE),
+              sumS = sum(Prefix=="S", na.rm=TRUE)) %>%
+    filter(sumNA<n) %>% # These are okay so drop them 
+    filter(n>5) %>% # Too little information
+    filter(n>5*sumNA) # Need plenty of good data
+
+#   Do some exploration
+
+bad_pts <- 
+df_prefix %>% filter(sumNA>0) %>%  arrange(-n) %>%  head(10)
+#   Subset dfnew based on these guys
+df_bad <- inner_join(dfnew, bad_pts, 
+                     by=c("Zipcode", "Street_name", "Street_type"))
+
+#   Make an sf object
+df_bad <- sf::st_as_sf(df_bad, coords=c("X", "Y"), crs=googlecrs, agr = "identity")
+
+#######   neeed to pull out street in zip to calc distances to
+for (pt in df_bad[df_bad$Prefix=="",]){
+  print("----")
+  foobar <- df_bad %>%  sf::st_distance(pt)
+  
+}
+
+
+##-----------------------------   stop here
+  
 
 
 
