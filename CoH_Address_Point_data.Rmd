@@ -985,26 +985,69 @@ df_prefix <- dfnew %>%
 #   Do some exploration
 
 bad_pts <- 
-df_prefix %>% filter(sumNA>0) %>%  arrange(-n) %>%  head(10)
+df_prefix %>% filter(sumNA>0) #%>%  arrange(-n) %>%  head(10)
 #   Subset dfnew based on these guys
 df_bad <- inner_join(dfnew, bad_pts, 
                      by=c("Zipcode", "Street_name", "Street_type"))
 
-#   Make an sf object
-df_bad <- sf::st_as_sf(df_bad, coords=c("X", "Y"), crs=googlecrs, agr = "identity")
-
-#######   neeed to pull out street in zip to calc distances to
-for (pt in df_bad[df_bad$Prefix=="",]){
-  print("----")
-  foobar <- df_bad %>%  sf::st_distance(pt)
-  
+Save_stats <- NULL
+df_worse <- df_bad[df_bad$Prefix=="",]
+####df_worse <- df_worse %>% filter(Street_name=="PEACEFUL CANYON")
+for (i in 1:nrow(df_worse)){
+  pt <- df_worse[i,]
+  print(paste("----", pt$Street_num, pt$Street_name, pt$Street_type))
+  eraseme <-  df_bad %>% 
+    filter(Street_name==pt$Street_name,
+           Street_type==pt$Street_type) %>% 
+    mutate(eucdist=sqrt((X_COORD - pt$X_COORD)^2 +
+                          (Y_COORD - pt$Y_COORD)^2)) %>% 
+    filter(eucdist <300,
+           !Prefix=="") %>% 
+  #   How many candidates do I get within 300 feet?
+    group_by(Prefix) %>%
+      summarize(num_pts=n(),
+                n=last(n),
+              sumE = sum(Prefix=="E"),
+              sumW = sum(Prefix=="W"),
+              sumN = sum(Prefix=="N"),
+              sumS = sum(Prefix=="S"),
+              Street_name=last(Street_name)
+                ) %>%
+    mutate(OBJECTID=pt$OBJECTID, 
+           Street_num=pt$Street_num)
+ #  If there is more than one prefix in the vicinity, don't do anything
+  if (nrow(eraseme)==1){
+    Save_stats <- rbind(Save_stats, eraseme)
+  }
 }
 
+#     Correct spots that have 5 or more neighbors within 300 feet that all have
+#     the same Prefix
 
+Save_stats <- Save_stats %>% 
+  filter(num_pts >= 5) %>% 
+  select(OBJECTID, Prefix_new=Prefix)
+
+#   Update corrections and dfnew
+
+ObjID <- Save_stats$OBJECTID
+foo <- left_join(df[df$OBJECTID %in% ObjID,],
+                 Save_stats,
+                 by="OBJECTID") %>% 
+  mutate(change=paste("Missing Prefix updated based on nearby points to",
+                      Prefix_new )) %>% 
+  select(-Prefix_new)
+
+corrections <- bind_rows(corrections, foo)
+
+dfnew[dfnew$OBJECTID %in% ObjID,]$Prefix <- Save_stats$Prefix_new
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_6"))
+saveRDS(corrections, paste0(path, "corrections_6.Rds"))
 ##-----------------------------   stop here
   
 
-
+####Save_stats[duplicated(Save_stats$OBJECTID),]
 
 ```
 
