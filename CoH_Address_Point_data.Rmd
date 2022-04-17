@@ -728,8 +728,6 @@ dfnew <- dfnew %>% mutate(CITY=str_to_upper(CITY))
 No last edited dates before 2015.
 
 ```{r}
-
-##-----------------------------   stop here
 #   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
 #   There are Y values missing...
 googlecrs <- 4326
@@ -779,6 +777,228 @@ dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Y_COORD <-
 foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
   mutate(change="Repaired Y_COORD by reprojecting") 
 corrections <- bind_rows(corrections, foo)
+
+#   Safety save
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_4"))
+saveRDS(corrections, paste0(path, "corrections_4.Rds"))
+
+```
+
+##        More zipcode stuff. Some are just plain wrong
+
+Gather data that should be the same address and calculate the max diagonal
+distance for each set of "duplicates" (we ignore apartment/building numbers,
+so expect duplicates)
+
+For distances that seem unreasonable, intersect the lat/long with the zipcode
+polygons and look for bad ones.
+
+If I can, correct the zipcode. If I can't, flag the point as hopeless. 
+
+```{r more zip}
+df_nodups <- 
+dfnew %>% #head(20000) %>% 
+  group_by(ZIPCODE, Street_name, Street_num, Street_type, Prefix) %>% 
+  summarise(n=n(),
+            Street_num=last(Street_num),
+            Prefix=last(Prefix),
+            Street_name=last(Street_name),
+            Street_type=last(Street_type),
+            ZIPCODE=tail(names(sort(table(ZIPCODE))),1),
+            Lat=mean(Y),
+            Lon=mean(X),
+            Xmax=(max(X_COORD)-min(X_COORD)),
+            Ymax=(max(Y_COORD)-min(Y_COORD)),
+            Diagonal=sqrt(Xmax**2 + Ymax**2),
+            Xstd=sd(X_COORD),
+            Ystd=sd(Y_COORD),
+            X=mean(X_COORD),
+            Y=mean(Y_COORD)
+            ) %>% 
+  select(Street_num, Prefix, Street_name, Street_type, ZIPCODE,
+         n, Diagonal, Xmax, Ymax, Xstd, Ystd, X, Y, Lat, Lon) %>% 
+  filter(n>1)
+
+#   Now let's intersect the df_nodups file, where the diagonal distance >500 ft
+#   with the zipcode polygons. I don't know which polygon file CoH uses, so I
+#   will use a recent one (2019) from the state.
+
+#   All texas zips
+
+temp <- readRDS(file = "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Zipcodes/COH_Zip_Polys.rds")
+
+temp <- temp %>% rename(Zip=ZIP_CODE) %>% 
+  mutate(Zip=as.character(Zip))
+
+# Prep coordinate file
+
+#   First pull out appropriate records from df_nodups
+
+tmp <- df_nodups %>% filter(Diagonal>500) %>% # let's start with the worst ones
+  select(Street_num, Prefix, Street_name, Street_type, ZIPCODE, Diagonal, n) %>% 
+  inner_join(dfnew,by=c("Street_num", "Prefix", "Street_name", 
+                        "Street_type", "ZIPCODE"))
+
+googlecrs <- 4326
+dat <- data.frame(Longitude=tmp$X, Latitude=tmp$Y, stringsAsFactors = FALSE)
+
+dat <- sf::st_as_sf(dat, coords=c("Longitude", "Latitude"), crs=googlecrs, agr = "identity")
+
+sf::sf_use_s2(FALSE)
+
+#   find points in polygons
+#   since zipcodes don't overlap, let's just grab the array index
+#   instead of creating a huge matrix
+a <- sf::st_intersects(dat, temp, sparse = TRUE)
+
+#   Append the zipcode field to the data frame
+tmp$Zip <- temp$Zip[unlist(a)]
+
+#   Look for Zip != Zipcode
+
+#   This represents all duplicate addresses that contain 2 or more zipcodes
+eraseme <- 
+tmp %>% mutate(Diagonal=as.character(Diagonal)) %>% 
+  group_by(Diagonal) %>% 
+    mutate(numzips=length(unique(Zip))) %>% 
+  ungroup() %>% 
+  filter(numzips>1) %>% # This gets rid of apartments and the like
+  mutate(Diagonal=as.numeric(Diagonal))
+
+#   Check bad zipcodes. Either they make no sense, or they might. Test by looking
+#   nearby for the street name
+
+#   More apartment insurance
+Bad_zips <- eraseme %>% filter(ZIPCODE!=Zip, n<10)
+
+#   Make an sf object
+Baddat <- sf::st_as_sf(Bad_zips, coords=c("X", "Y"), crs=googlecrs, agr = "identity")
+Bad_zips$hits <- 0 # How many addresses with same street name live in new zip?
+Bad_zips$closeness <- 0  # how close am I to the right zipcode?
+for (i in 1:nrow(Bad_zips)){
+  print(paste("---", i, "---", Bad_zips[i,]$Street_name))
+  Bad_zips[i,]$hits <- 
+    sum(str_detect(dfnew$ZIPCODE,Bad_zips[i,]$Zip) & 
+        str_detect(dfnew$Street_name,Bad_zips[i,]$Street_name)
+  )
+#   How close to bad zipcode is the point? Boundary of zip may have moved.
+  Bad_zips[i,]$closeness <- as.numeric(sf::st_distance(Baddat[i,], 
+                            temp[str_detect(temp$Zip,Bad_zips[i,]$ZIPCODE),]))
+}
+
+#   For closeness of < 250 feet, leave the record alone.
+
+Bad_zips <- Bad_zips %>% 
+  filter(closeness>250)
+
+#   for hits < 3, delete the record
+
+ObjID <- Bad_zips[Bad_zips$hits<3,]$OBJECTID
+
+foo <-  df[df$OBJECTID %in% ObjID,] %>% 
+  mutate(change="Location mismatches Zipcode so badly point discarded") 
+corrections <- bind_rows(corrections, foo)
+
+#   Delete record
+for (i in 1:nrow(Bad_zips)){
+  if (Bad_zips[i,]$hits<3) {
+    dfnew <- dfnew[dfnew$OBJECTID!=Bad_zips[i,]$OBJECTID,]
+  }
+}
+  
+#   for hits >=2, correct the zipcode
+ObjID <- Bad_zips[Bad_zips$hits>=3,]$OBJECTID
+
+foo <-  df[df$OBJECTID %in% ObjID,] %>% 
+  mutate(change=paste("Location mismatches Zipcode, correct it to", 
+                       Bad_zips[Bad_zips$OBJECTID %in% ObjID,]$Zip)) 
+
+foo2 <- Bad_zips[Bad_zips$OBJECTID %in% ObjID,] %>% 
+  select(OBJECTID, Zip)
+foo <- left_join(df[df$OBJECTID %in% ObjID,],
+                 foo2,
+                 by="OBJECTID") %>% 
+  mutate(change=paste("Location mismatches Zipcode, correct it to", Zip )) %>% 
+  select(-Zip)
+
+corrections <- bind_rows(corrections, foo)
+
+Bad_zips <- Bad_zips %>% filter(hits>=3)
+for (i in 1:nrow(Bad_zips)){
+    dfnew[dfnew$OBJECTID==Bad_zips[i,]$OBJECTID,]$ZIPCODE <- Bad_zips[i,]$Zip 
+}
+
+#     Let's look at dups again
+
+df_nodups <- 
+dfnew %>% #head(20000) %>% 
+  group_by(ZIPCODE, Street_name, Street_num, Street_type, Prefix) %>% 
+  summarise(n=n(),
+            Street_num=last(Street_num),
+            Prefix=last(Prefix),
+            Street_name=last(Street_name),
+            Street_type=last(Street_type),
+            ZIPCODE=tail(names(sort(table(ZIPCODE))),1),
+            Lat=mean(Y),
+            Lon=mean(X),
+            Xmax=(max(X_COORD)-min(X_COORD)),
+            Ymax=(max(Y_COORD)-min(Y_COORD)),
+            Diagonal=sqrt(Xmax**2 + Ymax**2),
+            Xstd=sd(X_COORD),
+            Ystd=sd(Y_COORD),
+            X=mean(X_COORD),
+            Y=mean(Y_COORD)
+            ) %>% 
+  select(Street_num, Prefix, Street_name, Street_type, ZIPCODE,
+         n, Diagonal, Xmax, Ymax, Xstd, Ystd, X, Y, Lat, Lon) %>% 
+  filter(n>1)
+
+#   Still needs work, but fixing more prefixes should help.
+
+##-----------------------------   stop here
+```
+
+```{r more prefixes}
+
+
+
+
+```
+
+
+
+```{r averaging}
+#   Complete file after cleanup
+saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
+
+########   rebuild dfnew from scratch. Now it only needs to drive the 
+########   averaging process. Update df accordingly and there will be no 
+########   duplicates left
+
+dfnew <- 
+dfnew %>% 
+  group_by(Zipcode, Street_name, Street_num, Street_type, Prefix) %>% 
+  summarise(n=n(),
+            Street_num=last(Street_num),
+            Prefix=last(Prefix),
+            Street_name=last(Street_name),
+            Street_type=last(Street_type),
+            City=last(City),
+            Zipcode=last(Zipcode),
+            Lat=mean(Lat),
+            Lon=mean(Lon),
+            Xstd=sd(X),
+            Ystd=sd(Y),
+            X=mean(X),
+            Y=mean(Y),
+            OBJECTID=last(OBJECTID)
+            ) %>% 
+  select(Street_num, Prefix, Street_name, Street_type, City, Zipcode,
+         n, Lat, Lon, Xstd, Ystd, X, Y, OBJECTID)  
+
+
+
 
 
 ```
