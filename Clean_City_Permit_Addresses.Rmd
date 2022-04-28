@@ -1,0 +1,53 @@
+---
+title: "Clean Permit Addresses"
+author: "Alan Jackson"
+date: '2022-04-28'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(postmastr)
+library(GeocodeHou)
+
+savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Permits/"
+df <- readRDS(paste0(savepath, "Permit_data.rds"))
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  Start with manual data cleanup
+
+Data had many issues (especially with what amounts to comments being placed
+in the street address field).
+So let's try to clean up the worst offenders.
+
+```{r manual clean}
+
+foo <- df %>%  head(100) %>% 
+#   get rid of address like 325 1/2. Get rid of the fraction
+  mutate(NewAddress=str_replace(Address, "^(\\d+ )\\d/\\d ", "\\1")) %>% 
+#   Protect farm roads by adding an "A" at end that will later go away
+  mutate(NewAddress=str_replace(NewAddress, " F M ", " FM ")) %>% 
+#   change & to AND
+  mutate(NewAddress=str_replace(NewAddress, "&", "AND")) %>% 
+#   Remove BLD (Building) designator
+  mutate(NewAddress=str_replace(NewAddress, " BLD ", " ")) %>% 
+#   streets designated are Private are special and hard to geocode.
+#   We will remove that designation, but then flag it in a comments column
+  mutate(Special=ifelse(str_detect(Address, " \\(PVT\\)"), "Private", "")) %>% 
+#   Remove anything in parenthesis
+  mutate(NewAddress=str_remove(NewAddress, "\\(.+\\)")) %>% 
+#   Remove anything following a type indicator
+  mutate(NewAddress=str_replace(NewAddress, "( DR) \\S+$", "\\1")) %>% 
+  mutate(NewAddress=str_replace(NewAddress, "( RD) \\S+$", "\\1")) %>% 
+  mutate(NewAddress=str_replace(NewAddress, "( AVE) \\S+$", "\\1")) %>% 
+
+```
+
+
+
+
+
+
+
