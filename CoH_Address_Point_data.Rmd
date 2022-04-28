@@ -275,7 +275,7 @@ get_corrections <- function(df_test, df_base, text_dist, geom_dist, min_votes){
                    STREET_NAME=last(STREET_NAME),
                    bad_name=last(bad_name),
                    bad_id=last(bad_id),
-                   min_dist=min(eucdist)
+                   min_dist=suppressWarnings(min(eucdist))
                    ) %>%
       ungroup() %>%
       filter(n>min_votes,
@@ -363,7 +363,7 @@ Old_street <- c("H M C", "^F M ", "^F.M. ",
                 "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$", " SQ$",
                 "^ST ")
 New_street <- c("H MARK CROSSWELL JR", "FM ", "FM ", 
-                "JOHN-A", "AVENUE ", "H AND R", "TKC", "SQUARE",
+                "JOHN-A", "AVENUE ", "H AND R", "TKC", " SQUARE",
                 "SAINT ")
 
 dfnew[dfnew$New_street=="H M C",]$New_street <- "H MARK CROSSWELL JR"
@@ -375,6 +375,7 @@ dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^AVE ", "AVENUE "))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^H R$", "H AND R"))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^T K C$", "TKC"))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street," SQ$", " SQUARE"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^ST ", "SAINT "))
 
 ObjID <- df %>% filter(str_detect(STREET_NAME, 
                                   paste(Old_street, collapse="|")))  
