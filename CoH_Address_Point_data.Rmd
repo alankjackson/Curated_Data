@@ -1,5 +1,5 @@
 ---
-title: "Read in CoH Address POint data"
+title: "Read in CoH Address Point data"
 author: "Alan Jackson"
 date: '2022-03-29'
 output: html_document
@@ -347,12 +347,24 @@ dfnew[dfnew$OBJECTID %in% tmp2$bad_id,]$New_street <- tmp2$STREET_NAME
 dfnew[dfnew$OBJECTID %in% tmp3$bad_id,]$New_street <- tmp3$STREET_NAME 
 dfnew[dfnew$OBJECTID %in% tmp4$bad_id,]$New_street <- tmp4$STREET_NAME 
 
+##########    Let's look at ST vs. SAINT
+
+eraseme <- 
+dt %>% as_tibble() %>%
+  filter(str_detect(Street_name, "^SAINT |^ST ")) %>%
+  mutate(pre=str_extract(Street_name, "^SAINT |^ST ")) %>% 
+  mutate(post=str_remove(Street_name, "^SAINT |^ST ")) %>% 
+  group_by(post, pre, Zipcode) %>% 
+    summarize(n=n())
+
 ##########    Now fix a few specific problems that appear
 
 Old_street <- c("H M C", "^F M ", "^F.M. ",
-                "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$")
+                "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$", " SQ$",
+                "^ST ")
 New_street <- c("H MARK CROSSWELL JR", "FM ", "FM ", 
-                "JOHN-A", "AVENUE ", "H AND R", "TKC")
+                "JOHN-A", "AVENUE ", "H AND R", "TKC", "SQUARE",
+                "SAINT ")
 
 dfnew[dfnew$New_street=="H M C",]$New_street <- "H MARK CROSSWELL JR"
 dfnew[dfnew$New_street=="2136TH F M 2920",]$New_street <- "FM 2920"
@@ -362,6 +374,7 @@ dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^JOHN A$", "JOHN-A"
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^AVE ", "AVENUE "))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^H R$", "H AND R"))
 dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^T K C$", "TKC"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street," SQ$", " SQUARE"))
 
 ObjID <- df %>% filter(str_detect(STREET_NAME, 
                                   paste(Old_street, collapse="|")))  
