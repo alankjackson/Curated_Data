@@ -24,24 +24,93 @@ So let's try to clean up the worst offenders.
 
 ```{r manual clean}
 
-foo <- df %>%  head(100) %>% 
+#   Clean up extra whitespace
+
+df <- df %>% mutate(Address=str_squish(Address))
+
+#   Let's run some tests
+
+foo <- string_replace(df, "Address", "^(\\d+)\\s?\\d/\\d ", "\\1 ")
+foo <- string_replace(df, "Address", " F M ", " FM ")
+foo <- string_replace(df, "Address", "&", "AND")
+foo <- string_replace(df, "Address", " BLD [A-Z1-9]$", " ")
+foo <- string_replace(df, "Address", "BUFFALO SPEEDWAY", "BUFFALO SPWY")
+foo <- string_replace(df, "Address", " \\(PVT\\)",  "-----")
+foo <- string_replace(df, "Address", "\\(.+\\)", "")
+foo <- foo %>% mutate(Address=str_squish(Address))
+foo <- string_replace(df, "Address", " A AND B", "")
+foo <- string_replace(df, "Address", " FL[R]?\\s?\\d+$", " ")
+foo <- string_replace(df, "Address", " STE [A-Z0-9-\\.]+$", " ")
+foo <- string_replace(df, "Address", " [\\w]+-[\\w]+$", "")
+foo <- string_replace(df, "Address", "^(\\d+) ST ", "\\1 SAINT ")
+foo <- string_replace(df, "Address", "^(\\d+ [NSEW]) ST ", "\\1 SAINT ")
+
+foo2 <- string_replace(foo, "Address", "( DR) \\S+$", "\\1")
+
+
+foo <- df %>% # head(5000) %>% 
+#   get rid of extra white space
+       mutate(Address=str_squish(Address)) %>% 
 #   get rid of address like 325 1/2. Get rid of the fraction
-  mutate(NewAddress=str_replace(Address, "^(\\d+ )\\d/\\d ", "\\1")) %>% 
-#   Protect farm roads by adding an "A" at end that will later go away
-  mutate(NewAddress=str_replace(NewAddress, " F M ", " FM ")) %>% 
+       string_replace( "Address", "^(\\d+)\\s?\\d/\\d ", "\\1 ", "Apply") %>% 
+#   Collapse farm roads 
+       string_replace("Output", " F M ", " FM ", "Apply") %>% 
 #   change & to AND
-  mutate(NewAddress=str_replace(NewAddress, "&", "AND")) %>% 
+       string_replace("Output", "&", "AND", "Apply") %>% 
 #   Remove BLD (Building) designator
-  mutate(NewAddress=str_replace(NewAddress, " BLD ", " ")) %>% 
+       string_replace("Output", " BLD\\s?[\\w]+$", "", "Apply") %>% 
+#   Take care of Buffalo Speedway
+       string_replace("Output", "BUFFALO SPEEDWAY", "BUFFALO SPWY", "Apply") %>% 
 #   streets designated are Private are special and hard to geocode.
 #   We will remove that designation, but then flag it in a comments column
   mutate(Special=ifelse(str_detect(Address, " \\(PVT\\)"), "Private", "")) %>% 
 #   Remove anything in parenthesis
-  mutate(NewAddress=str_remove(NewAddress, "\\(.+\\)")) %>% 
-#   Remove anything following a type indicator
-  mutate(NewAddress=str_replace(NewAddress, "( DR) \\S+$", "\\1")) %>% 
-  mutate(NewAddress=str_replace(NewAddress, "( RD) \\S+$", "\\1")) %>% 
-  mutate(NewAddress=str_replace(NewAddress, "( AVE) \\S+$", "\\1")) %>% 
+       string_replace("Output", "\\(.+\\)", "", "Apply") %>% 
+#   Remove "A AND B"
+       string_replace("Output", " A\\s?AND\\s?B", "", "Apply") %>% 
+#   Remove "FL" for Floor
+       string_replace("Output", " FL[R]?\\s?\\w+$", " ", "Apply") %>% 
+#   Remove "STE" for Suite
+       string_replace("Output", " STE [A-Z0-9-\\.]+$", " ", "Apply") %>% 
+#   Remove "." but carefully. Collapse extra white space afterwards
+       mutate(Output=str_replace_all(Output, "\\.", " ")) %>% 
+       mutate(Output=str_squish(Output)) %>%  
+#   Remove stuff with dashes in them except John-A
+       mutate(Output=str_replace(Output, "JOHN-A", "JOHN:A")) %>% 
+       string_replace("Output", " [\\w]+-[\\w]+$", "", "Apply") %>% 
+       mutate(Output=str_replace(Output, "JOHN:A", "JOHN-A")) %>% 
+#   Convert ST to SAINT
+       string_replace("Output", "^(\\d+) ST ", "\\1 SAINT ", "Apply") %>% 
+       string_replace("Output", "^(\\d+ [NSEW]) ST ", "\\1 SAINT ", "Apply") %>% 
+#   Correct Parkway abbreviation
+       string_replace("Output", " PKY", " PKWY", "Apply") %>% 
+#   Correct Plaza streets
+       string_replace("Output", 
+                      "(LAWNDALE|LOVE|GREENWAY|MEYERLAND|WILCREST) PLAZA", 
+                      "\\1 PLZ", "Apply") 
+
+Types <- paste(Allowed_types, collapse="| ")
+
+foo2 <- foo %>% #   need to protect a poorly named street
+  mutate(Output=str_replace(Output, "LOOP CENTRAL", "LOOPYCENTRAL")) %>% 
+  mutate(Output=str_replace(Output, "LOOP 494", "LOOPY494")) %>% 
+  mutate(Output=str_replace(Output, "LOOP 201", "LOOPY201")) %>% 
+  string_replace("Output", paste0("( ",Types,") .+$"), "\\1", "Apply") %>% 
+  mutate(Output=str_replace(Output, "LOOPY494", "LOOP 494")) %>% 
+  mutate(Output=str_replace(Output, "LOOPY201", "LOOP 201")) %>% 
+  mutate(Output=str_replace(Output, "LOOPYCENTRAL", "LOOP CENTRAL"))  
+
+Farm_roads <- "FM 1960|FM 2100|FM 2351|FM 529|FM 2920|FM 1485|FM 2855|FM 1093|FM 2234|FM 362|FM 1942|FM 1314|FM 1463|FM 723|FM 1464|FM 686|FM 2978|FM 528|FM 521 |FM 1098|FM 149|FM 1959|FM 359|FM 1488|FM 249|FM 2917|FM 1736|FM 526"
+
+foo2 <- foo2 %>% 
+  string_replace("Output", paste0("(",Farm_roads,") .+$"), "\\1", "Apply")
+
+
+eraseme <- foo %>% 
+  filter(Address != NewAddress)
+  #filter(str_detect(Address, "\\d+$")) %>% 
+  #filter(str_detect(NewAddress, " \\d+$"))
+
 
 ```
 
