@@ -1141,6 +1141,34 @@ saveRDS(corrections, paste0(path, "corrections_7.Rds"))
 
 ```
 
+##   Fix some specific errors manually
+
+```{r manual}
+
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_7"))
+corrections <- readRDS(paste0(path, "corrections_7.Rds"))
+
+#   Martin Luther King consistently missing Jr at end
+
+Old_street <- c("MARTIN LUTHER KING$", "^F M ", "^F.M. ",
+                "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$", " SQ$",
+                "^ST ")
+New_street <- c("MARTIN LUTHER KING JR", "FM ", "FM ", 
+                "JOHN-A", "AVENUE ", "H AND R", "TKC", " SQUARE",
+                "SAINT ")
+
+dfnew[dfnew$New_street=="MARTIN LUTHER KING$",]$New_street <- "MARTIN LUTHER KING JR"
+
+
+ObjID <- df %>% filter(str_detect(STREET_NAME, 
+                                  paste(Old_street, collapse="|")))  
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change=paste("Corrected street name to", 
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$New_street)) 
+corrections <- bind_rows(corrections, foo)
+
+```
 
 
 ```{r averaging}
