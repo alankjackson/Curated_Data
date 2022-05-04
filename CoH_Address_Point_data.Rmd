@@ -1148,25 +1148,81 @@ saveRDS(corrections, paste0(path, "corrections_7.Rds"))
 dfnew <- readRDS(paste0(path, "temporary_intermediate_file_7"))
 corrections <- readRDS(paste0(path, "corrections_7.Rds"))
 
+eraseme <- dfnew %>% 
+  mutate(pseudotype=str_extract(Street_name, "\\w+$")) %>% 
+  filter(pseudotype==Street_type) %>% 
+  group_by(Street_name) %>% 
+    summarize(Street_type=last(Street_type),
+              n=n())
 #   Martin Luther King consistently missing Jr at end
+#   Baron Brook Dr Dr not sensible, etc
 
-Old_street <- c("MARTIN LUTHER KING$", "^F M ", "^F.M. ",
-                "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$", " SQ$",
-                "^ST ")
-New_street <- c("MARTIN LUTHER KING JR", "FM ", "FM ", 
-                "JOHN-A", "AVENUE ", "H AND R", "TKC", " SQUARE",
-                "SAINT ")
+Old_street <- c("MARTIN LUTHER KING$", "BARON BROOK DR", "BROKEN BACK DR STE",
+                "COLBURN DR N", "SAGEBROOK DR", "LINBROOK DRIVE", 
+                "HAYBROOK DRIVE", "SANOUR DR", "FAIRWAY DR STE",
+                "SHERWOOD RIDGE DRIVE", "BRITTMOORE PARK DRIV", 
+                "CANDLELIGHT PLACE DR", "STEINHAGEN RD", "BLACK FALCON RD",
+                "NICHOLSON ST", "SINGLE OAK ST", "PALSTON BEND LN",
+                "SIENNA COVE LN", "LA PORTE FWY", "COMETS RUN",
+                "OAK RIDGE DRIVE", "BEMBRIDGE DRIVE", "PAXTON DRIVR",
+                "GILBERT SCOTT DR", "GREENS LANDING DR", 
+                "HAVEN CREEK DR/BACKS", "MAGIC FALLS DRIVE",
+                "BLUE BONNET DRIVE", "FALLBROOKD DR", "CYPRESS VALLEY DR",
+                "CLIFF PARK DRIVE", "WHITE OAK RIDGE DR", "IMPERIAL CREEK DRIVE",
+                "LAZY CREEK DR", "KILBURN RD", "FRY RD", "MITCHELL RD",
+                "BARKALOO RD STE", "SHERIDAN RD", "ROBERT RD ROBERT",
+                "MALCOLMSON RD", "PIN OAK RD", "MONDAY HARGR 0VE RD",
+                "SMITHFIELD CROSSING LN", "DA VINA LN", "SCROGGINS LN",
+                "1510TH BEVIS ST", "PECAN ST STE", "LEADER ST", "SAGECIRCLE ST 1",
+                "CENTRAL AVE", "FRANK SCOTT BLVD", "ALCEA CT", "CLIFF MARSHAL ST",
+                "COUNTRY VILLAGE BLVD", "CREEK CIR", "FRANK SCOTT BLVD",
+                "HOBBY AIRPORT LOOP", "MOSSY OAK DR", "MOUNTAIN MAPLE CT",
+                "OLD MAIN LOOP", "PETINA CYPRESS CT")
 
-dfnew[dfnew$New_street=="MARTIN LUTHER KING$",]$New_street <- "MARTIN LUTHER KING JR"
+New_street <- c("MARTIN LUTHER KING JR", "BARON BROOK", "BROKEN BACK",
+                "COLBURN", "SAGEBROOK", "LINBROOK",
+                "HAYBROOK", "SANOUR", "FAIRWAY",
+                "SHERWOOD RIDGE", "BRITTMOORE PARK",
+                "CANDLELIGHT PLACE", "STEINHAGEN", "BLACK FALCON",
+                "NICHOLSON", "SINGLE OAK", "PALSTON BEND",
+                "SIENNA COVE", "LA PORTE", "COMETS",
+                "OAK RIDGE", "BEMBRIDGE", "PAXTON",
+                "GILBERT SCOTT", "GREENS LANDING",
+                "HAVEN CREEK", "MAGIC FALLS",
+                "BLUE BONNET", "FALLBROOK", "CYPRESS VALLEY",
+                "CLIFF PARK", "WHITE OAK RIDGE", "IMPERIAL CREEK",
+                "LAZY CREEK", "KILBURN", "FRY", "MITCHELL",
+                "BARKALOO", "SHERIDAN", "ROBERT",
+                "MALCOLMSON", "PIN OAK", "MONDAY HARGROVE", 
+                "SMITHFIELD CROSSING", "DA VINA", "SCROGGINS",
+                "BEVIS", "PECAN", "LEADER", "SAGECIRCLE",
+                "CENTRAL", "FRANK SCOTT", "ALCEA", "CLIFF MARSHAL",
+                "COUNTRY VILLAGE", "CREEK", "FRANK SCOTT",
+                "HOBBY AIRPORT", "MOSSY OAK", "MOUNTAIN MAPLE",
+                "OLD MAIN", "PETINA CYPRESS")
 
+#  First repair type where needed
 
-ObjID <- df %>% filter(str_detect(STREET_NAME, 
+dfnew[str_detect(dfnew$Street_name, "FAIRWAY DR STE"),]$Street_type <- "DR"
+dfnew[str_detect(dfnew$Street_name, "PAXTON DRIVR"),]$Street_type <- "DR"
+dfnew[str_detect(dfnew$Street_name, "HAVEN CREEK DR/BACKS"),]$Street_type <- "DR"
+dfnew[str_detect(dfnew$Street_name, "BLACK FALCON RD"),]$Street_type <- "RD"
+dfnew[str_detect(dfnew$Street_name, "LA PORTE FWY"),]$Street_type <- "FWY"
+dfnew[str_detect(dfnew$Street_name, "FRANK SCOTT BLVD"),]$Street_type <- "BLVD"
+
+#   Now repair names
+
+for (i in 1:length(Old_street)) {
+  dfnew[str_detect(dfnew$Street_name,Old_street[i]),]$Street_name <- New_street[i]
+}
+
+ObjID <- dfnew %>% filter(str_detect(STREET_NAME, 
                                   paste(Old_street, collapse="|")))  
 
-foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+foobar <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
   mutate(change=paste("Corrected street name to", 
-                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$New_street)) 
-corrections <- bind_rows(corrections, foo)
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Street_name)) 
+corrections <- bind_rows(corrections, foobar)
 
 ```
 
@@ -1176,7 +1232,7 @@ corrections <- bind_rows(corrections, foo)
 saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
 
 ########   rebuild dfnew from scratch. Now it only needs to drive the 
-########   averaging process. Update df accordingly and there will be no 
+########   averaging process. Update dfnew accordingly and there will be no 
 ########   duplicates left
 
 dfnew <- 
@@ -1205,5 +1261,7 @@ dfnew %>%
 
 saveRDS(dfnew, paste0(path, "COH_Geocoding_Locations.rds"))
 
+dt <- data.table::as.data.table(dfnew)
+saveRDS(dt,paste0(path, "COH_Geocoding_Locations_table.rds"))
 
 ```
