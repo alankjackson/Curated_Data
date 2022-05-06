@@ -8,6 +8,7 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(postmastr)
+detach("package:GeocodeHou", unload=TRUE)
 library(GeocodeHou)
 
 savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Permits/"
@@ -48,7 +49,12 @@ foo <- string_replace(df, "Address", "^(\\d+ [NSEW]) ST ", "\\1 SAINT ")
 foo <- string_replace(foo, "Address", "( DR) \\S+$", "\\1")
 
 
-foo <- df %>% # head(5000) %>% 
+
+# Protect Nasa Rd 1, it is unique in having a number following RD
+
+foo <- df %>% mutate(Address=str_replace(Address, "NASA RD 1", "NASA ROAD 1"))
+
+foo <- foo %>% # head(5000) %>% 
 #   get rid of extra white space
        mutate(Address=str_squish(Address)) %>% 
 #   get rid of address like 325 1/2. Get rid of the fraction
@@ -126,16 +132,20 @@ Types <- paste(c(" ALY", "AVE", "BLF", "BLVD", "BND", "BR", "BRG", "BRK",
  foo <- foo %>% 
    string_replace("Output", paste0("( ",Types,") .+$"), "\\1", "Apply")  
 
- ###############################   why doesn't this work???????????
- More_types <- paste(c(" MALL", "PLACE", "WAY"), collapse="| ")
+ More_types <- " MALL| WAY| PLACE"
+ 
  foo <- foo %>% 
-   string_replace("Output", paste0("( ",More_types,") \\d+$"), "\\1", "Apply")  
+   string_replace("Output", paste0("(",More_types,") \\w?\\d+$"), "\\1", "Apply")  
+ 
  
 Farm_roads <- "FM 1960|FM 2100|FM 2351|FM 529|FM 2920|FM 1485|FM 2855|FM 1093|FM 2234|FM 362|FM 1942|FM 1314|FM 1463|FM 723|FM 1464|FM 686|FM 2978|FM 528|FM 521 |FM 1098|FM 149|FM 1959|FM 359|FM 1488|FM 249|FM 2917|FM 1736|FM 526"
 
 foo <- foo %>% 
   string_replace("Output", paste0("(",Farm_roads,") .+$"), "\\1", "Apply")
 
+# Unprotect Nasa Rd 1, it is unique in having a number following RD
+
+foo <- foo %>% mutate(Output=str_replace(Output, "NASA ROAD 1", "NASA RD 1"))
 #     What are ambiguous suffixes?
 
 All_types <- df_names_only$Street_type %>% sort() %>% unique() 
@@ -144,9 +154,7 @@ All_types <- All_types[2:length(All_types)] # get rid of blank
 
 All_types <- paste0(" ", All_types)
 
-All_types <- paste0(All_types, compact="|")
-
-mask <- str_detect(df_names_only$Street_name, All_types) 
+All_types <- paste0(All_types, collapse="|")
 
 foobar <- df_names_only %>% 
   group_by(Street_name) %>% 
@@ -206,21 +214,23 @@ Failed_match <- NULL
 
 for (i in 1:nrow(foo)){ # first look for exact matches
 #for (i in 2500:5000){ # first look for exact matches takes about 1 minute
-  if (i%%100==0) { print(paste("---",i,"---")) }
+  if (i%%1000==0) { print(paste("---",i,"---")) }
   tmp <- match_exactly(foo[i,]$pm.house, foo[i,]$pm.preDir, foo[i,]$pm.street,
                        foo[i,]$pm.streetSuf, foo[i,]$Zipcode)
   if (tmp$Success){ #   success
     Exact_match <- cbind(foo[i,], tmp) %>% 
-      select(pm.house, pm.preDir, pm.street, pm.streetSuf, Zipcode, Lat, Lon) %>% 
+      select(pm.id, pm.house, pm.preDir, pm.street, pm.streetSuf, Zipcode, Lat, Lon) %>% 
       rbind(., Exact_match)
   } else { #  Fail exact match
     Failed_match <- cbind(foo[i,], tmp) %>% 
-      select(pm.house, pm.preDir, pm.street, pm.streetSuf, Zipcode, Fail,
+      select(pm.id, pm.house, pm.preDir, pm.street, pm.streetSuf, Zipcode, Fail,
              Lat, Lon) %>% 
       rbind(., Failed_match)
   }
 }
 
+saveRDS(Exact_match, paste0(savepath, "Keep_Exactmatch.rds"))
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch.rds"))
 
 ```
 
@@ -232,13 +242,14 @@ for (i in 1:nrow(foo)){ # first look for exact matches
 Failed_match <- Failed_match %>% mutate(Correction=NA)
 
 for (i in 1:nrow(Failed_match)){
-  if (i%%10==0) { print(paste("---",i,"---")) }
+  if (i%%100==0) { print(paste("---",i,"---")) }
   target <- Failed_match[i,]
   tmp <- repair_zipcode(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
   if (tmp$Success){ #   success
     Failed_match[i,]$Lat <- tmp$Lat
     Failed_match[i,]$Lon <- tmp$Lon
+    Failed_match[i,]$Fail <- paste(Failed_match[i,]$Fail, "Zipcode")
     Failed_match[i,]$Correction <- tmp$New_zipcode
   } 
 }
@@ -251,6 +262,7 @@ for (i in 1:nrow(Failed_match)){
 
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Street_name") {next} # skip if name isn't the issue
+  if (Failed_match[i,]$Lat > 0) {next} # skip if zipcode resolved it
   if (i%%10==0) { print(paste("---",i,"---")) }
   target <- Failed_match[i,]
   tmp <- repair_name(target$pm.house, target$pm.preDir, target$pm.street,
@@ -271,7 +283,7 @@ for (i in 1:nrow(Failed_match)){
 ```{r bad types}
 
 for (i in 1:nrow(Failed_match)){
-  if (Failed_match[i,]$Fail!="Street_type") {next} # skip if name isn't the issue
+  if (Failed_match[i,]$Fail!="Street_type") {next} # skip if type isn't the issue
   if (i%%10==0) { print(paste("---",i,"---")) }
   target <- Failed_match[i,]
   tmp <- repair_type(target$pm.house, target$pm.preDir, target$pm.street,
@@ -333,4 +345,97 @@ for (i in 1:nrow(Failed_match)){
 
 
 ```
+
+##        Results
+
+Very nearly half of the failures were recovered. That is pretty good. So
+out of 130,000 addresses (with many duplicates), all but 4400 were geocoded.
+
+```{r near final}
+
+#   Combine all the files and produce a final failure file that we can try a few
+#   more tricks with.
+
+saveRDS(Exact_match, paste0(savepath, "Keep_Exactmatch_final.rds"))
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_final.rds"))
+
+Final <- left_join(foo, select(Exact_match, pm.id, Lat, Lon), by="pm.id")
+
+Final <- left_join(Final,
+                   select(Failed_match, pm.id, Lat, Lon, Fail, Correction),
+                   by="pm.id")
+
+Final <- Final %>% 
+  rowwise() %>% 
+  mutate(Lat.x=ifelse(is.null(Lat.x), Lat.y, Lat.x)) %>% 
+  mutate(Lon.x=ifelse(is.null(Lon.x), Lon.y, Lon.x)) %>% 
+  rename(Lon=Lon.x, Lat=Lat.x) %>% 
+  select(-Lat.y, -Lon.y)
+
+#   Prefix
+
+Final <- Final %>% 
+  mutate(pm.preDir=case_when(
+    replace_na(str_detect(Fail, "^Prefix$"), FALSE) ~ Correction,
+    TRUE                                            ~ pm.preDir
+  ))
+
+#   Name
+
+Final <- Final %>% 
+  mutate(pm.street=case_when(
+    replace_na(str_detect(Fail, "^Street_name$"), FALSE) ~ Correction,
+    TRUE                                                 ~ pm.street
+  ))
+
+#   Zipcode
+
+Final <- Final %>% 
+  mutate(Zipcode=case_when(
+    replace_na(str_detect(Fail, "^Street_name Zipcode$"), FALSE) ~ Correction,
+    TRUE                                                         ~ Zipcode
+  ))
+
+#   Type
+
+Final <- Final %>% 
+  mutate(pm.streetSuf=case_when(
+    replace_na(str_detect(Fail, "^Street_type$"), FALSE) ~ Correction,
+    TRUE                                                 ~ pm.streetSuf
+  ))
+
+#   Rename some columns to better document
+
+Final <- Final %>% 
+  rename(Number=pm.house, Prefix=pm.preDir, Name=pm.street, Type=pm.streetSuf,
+         Original_address=Address, Cleaned_address=Output)
+
+saveRDS(Final, paste0(savepath, "Clean_Final_2017_to_Mar_2022.rds"))
+
+
+```
+
+```{r}
+
+#     Let's do a little repair until whole thing is rerun.
+
+
+Failed_match <- readRDS(paste0(savepath, "Keep_Failedmatch_final.rds"))
+
+Failed_match[str_detect(replace_na(Failed_match$Correction, ""),
+                        "^\\d{5}$"),]$Fail <- 
+  "Street_name Zipcode"
+           
+
+
+```
+
+
+
+
+
+
+
+
+
 
