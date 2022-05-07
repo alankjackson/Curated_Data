@@ -36,7 +36,7 @@ df <- tbls_ls[[1]]
 #  Let's save our table
 
 saveRDS(df ,paste0(path, "Incrementals/",
-                        paste0(lubridate::now(), collapse = "_"),
+                        str_replace(lubridate::now(), " ", "_"),
                         "_table.rds"))
 
 
