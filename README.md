@@ -139,7 +139,7 @@ Permit data for the city of Houston
 
 https://www.houstontx.gov/planning/DevelopRegs/dev_reports.html
 
-Weekly data files form 2017 forward. Stored as tables in a docx file.
+Weekly data files from 2017 forward. Stored as tables in a docx file.
 
 ---------------------------
 Address points (lat-longs for street addresses) City of Houston
@@ -170,7 +170,16 @@ Weekly docx files with a table in each file
 
 Download 8 April 2022
 
+A geocoded and cleaned up file has been produced
+-----------------------------
+HFD incidents
 
+https://cohweb.houstontx.gov/ActiveIncidents/Combined.aspx?agency=%
+
+Download every hour at 5 after the hour
+
+Begun May 6, 2022
+-------------------------------
 
 
 
