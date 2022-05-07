@@ -1,0 +1,90 @@
+---
+title: "Houston Neighborhoods"
+author: "Alan Jackson"
+date: '2022-05-07'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Neighborhoods/"
+
+googlecrs <- 4326
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    Trials and tribulations
+
+*** Add Neighborhoods. ***
+Neighborhoods are a difficult dataset. The definition is rather loose, and they may overlap. And the sources for neighborhood data are limited. I looked at three: Zillow, City of Houston GIS, and Wikimapia. Zillow is very nice data, easy to download and work with, but not complete. I think they disallow overlapping polygons. The City of Houston is really subdivisions, and is a work in progress, so it didn't help much. So Wikimapia. The data itself is excellent. For some points, as many as 5 associated neighborhoods, so it seems to be pretty complete. Plus, if I find errors, I can edit the source data.
+However, many challenges downloading and then loading the data into R.
+
+To download, I used the Wikimapia API builder, noted in http://blog.cartong.org/2014/10/30/tutorial-using-wikimapia-data-in-qgis/
+which generated a command line of
+http://api.wikimapia.org/?key=MYKEY-GETYOUROWN&function=box&coordsby=bbox&bbox=-95.789963%2C29.518566%2C-95.005814%2C30.005814&category=4621&count=2000&format=kml
+
+I generated JSON, KML, and XML outputs. I struggled for hours to try to read
+*any* of the three into R, without success. Finally I got a clue and found
+success by going outside R and using ogr. The Wikimapia files appear to be
+malformed somehow, but ogr can handle it.
+
+ogr2ogr -f GML Neighborhoods.gml Neighborhoods.kml -explodecollections
+
+ogr2ogr -f "ESRI Shapefile" Nbhd_point.shp Neighborhoods.gml -sql "select * from Layer0 where OGR_GEOMETRY='POINT'" -lco SHPT=POINT
+
+ogr2ogr -f "ESRI Shapefile" Nbhd_line.shp Neighborhoods.gml -sql "select * from Layer0 where OGR_GEOMETRY='LINESTRING'" -lco SHPT=ARC
+
+
+```{r read in}
+
+#   Read in the shapefiles we created with ogr2ogr, to a simple feature
+Neighborhoodpolys <- sf::read_sf(paste0(path, "/Wikimapia/Nbhd_line.shp"))
+
+# now need to delete extra crap from file, just to be tidy
+temp <- Neighborhoodpolys %>% select(Name, descriptio, geometry)
+summary(temp) # check to see what it looks like. Could also do plot(temp)
+#     Name            descriptio                      geometry  
+# Length:975         Length:975         GEOMETRYCOLLECTION:975  
+# Class :character   Class :character   epsg:4326         :  0  
+# Mode  :character   Mode  :character   +proj=long...     :  0  
+
+#   set CRS. Since Wikimapia is based on Google maps photos, CRS is 
+#   same as Google.
+sf::st_crs(temp) <- googlecrs
+#   turn lines into polygons
+temp <- sf::st_polygonize(temp)
+
+# But first fix a few issues
+temp$Name <- str_replace(temp$Name,"&#039;","'")
+temp$Name <- str_replace(temp$Name,"Associaition","Association")
+temp$Name <- str_replace(temp$Name,"&amp;","&")
+
+#     Add short names for better labels
+
+temp <- temp %>% 
+  mutate(Short_name=str_remove(Name, "\\(?Super Neighborhood \\d+\\)?")) %>%  
+  mutate(Short_name=str_remove(Short_name, "\\(?SN ?\\d+\\)?")) %>% 
+  mutate(Short_name=str_remove(Short_name, "\\(.*\\)")) %>% 
+  mutate(Short_name=str_remove(Short_name, " Subdivision")) %>% 
+  mutate(Short_name=str_remove(Short_name, " [Nn]eighborhood")) %>% 
+  mutate(Short_name=str_replace(Short_name, " Section", " Sec")) %>% 
+  mutate(Short_name=str_remove(Short_name, "\\(South Briar Community Association"))  
+  
+#   Save file
+
+saveRDS(temp, paste0(path, "Neighborhood_polys_wikimapia.rds"))
+
+```
+
+
+
+
+
+
+
+
+
+
+
