@@ -1,0 +1,36 @@
+---
+title: "Consolidate HFD data"
+author: "Alan Jackson"
+date: '2022-05-07'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/HFD_Incidents/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    read in the extant files
+
+Read in the files that have been downloaded so far
+
+```{r read in}
+
+filenames <- list.files(path = paste0(path, "Incrementals/"),
+                        pattern="*_table.rds$")
+
+filenames <- paste0(paste0(path, "Incrementals/"),filenames)
+
+df <- filenames %>% 
+  purrr::map_dfr(readRDS) %>% 
+  unique() # get rid of duplicates
+
+
+```
+
+
+
+
