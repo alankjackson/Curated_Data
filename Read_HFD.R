@@ -26,7 +26,7 @@ tbls_ls <- xml2::read_html(url) %>%
 #   Save this in case of catastrophic failure
 
 saveRDS(tbls_ls ,paste0(path, "Incrementals/",
-                        paste0(lubridate::now(), collapse = "_"),
+                        str_replace(lubridate::now(), " ", "_"),
                         "_rawtable.rds"))
 
 #   And we pluck out a beautiful table
