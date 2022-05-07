@@ -1,0 +1,15 @@
+---
+title: "Read in floodplain data"
+author: "Alan Jackson"
+date: '2022-05-07'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Flood_Plains/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
