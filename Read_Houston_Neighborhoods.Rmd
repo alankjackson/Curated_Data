@@ -7,6 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(sf)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Neighborhoods/"
 
@@ -23,7 +24,18 @@ However, many challenges downloading and then loading the data into R.
 
 To download, I used the Wikimapia API builder, noted in http://blog.cartong.org/2014/10/30/tutorial-using-wikimapia-data-in-qgis/
 which generated a command line of
+
+http://wikimapia.org/api?action=create_key
+
+for ajackson.org
+23523C7E-AEAF8DB3-CDE1EFEC-2B447357-9E16F369-A1924E0E-878711F2-1F552310
+
+for adelieresources.com
+23523C7E-F35339CC-105CD5F5-57788CE9-1CE8B9EE-AE7815B5-4A8DC5BE-19CC32CE
+
 http://api.wikimapia.org/?key=MYKEY-GETYOUROWN&function=box&coordsby=bbox&bbox=-95.789963%2C29.518566%2C-95.005814%2C30.005814&category=4621&count=2000&format=kml
+
+https://www.im-portal.org/
 
 I generated JSON, KML, and XML outputs. I struggled for hours to try to read
 *any* of the three into R, without success. Finally I got a clue and found
@@ -40,7 +52,7 @@ ogr2ogr -f "ESRI Shapefile" Nbhd_line.shp Neighborhoods.gml -sql "select * from 
 ```{r read in}
 
 #   Read in the shapefiles we created with ogr2ogr, to a simple feature
-Neighborhoodpolys <- sf::read_sf(paste0(path, "/Wikimapia/Nbhd_line.shp"))
+Neighborhoodpolys <- sf::read_sf(paste0(path, "/Wikimapia_2022/Nbhd_line.shp"))
 
 # now need to delete extra crap from file, just to be tidy
 temp <- Neighborhoodpolys %>% select(Name, descriptio, geometry)
@@ -54,7 +66,8 @@ summary(temp) # check to see what it looks like. Could also do plot(temp)
 #   same as Google.
 sf::st_crs(temp) <- googlecrs
 #   turn lines into polygons
-temp <- sf::st_polygonize(temp)
+###temp <- sf::st_polygonize(temp)
+###temp <- sf::st_as_sf(temp)
 
 # But first fix a few issues
 temp$Name <- str_replace(temp$Name,"&#039;","'")
@@ -63,20 +76,143 @@ temp$Name <- str_replace(temp$Name,"&amp;","&")
 
 #     Add short names for better labels
 
-temp <- temp %>% 
+temp2 <- temp %>% 
   mutate(Short_name=str_remove(Name, "\\(?Super Neighborhood \\d+\\)?")) %>%  
   mutate(Short_name=str_remove(Short_name, "\\(?SN ?\\d+\\)?")) %>% 
   mutate(Short_name=str_remove(Short_name, "\\(.*\\)")) %>% 
   mutate(Short_name=str_remove(Short_name, " Subdivision")) %>% 
   mutate(Short_name=str_remove(Short_name, " [Nn]eighborhood")) %>% 
   mutate(Short_name=str_replace(Short_name, " Section", " Sec")) %>% 
-  mutate(Short_name=str_remove(Short_name, "\\(South Briar Community Association"))  
-  
+  mutate(Short_name=str_remove(Short_name, "\\(South Briar Community Association")) %>% 
+  select(Name, Short_name, descriptio, geometry)
+#   turn lines into polygons
+###temp2 <- sf::st_polygonize(temp2)
+
 #   Save file
 
-saveRDS(temp, paste0(path, "Neighborhood_polys_wikimapia.rds"))
+saveRDS(temp2, paste0(path, "Neighborhood_polys_wikimapia.rds"))
 
 ```
+
+##        Let's make a nice map
+
+
+```{r map them}
+
+library(leaflet)
+
+ggplot(temp2) + 
+  geom_sf()  
+  geom_sf_label(aes(label=Short_name), label.size=NA, alpha=0.0, size=2)
+
+leaflet(temp2) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons()
+
+```
+
+
+##        City of Houston super neighborhoods
+
+Looks good, looks watertight and comprehensive. Possibly the most useful
+set of neighborhoods for many purposes.
+
+https://cohgis-mycity.opendata.arcgis.com/datasets/deae15e7f3db4b198946c17f0d169c39/explore?location=29.721674%2C-95.357101%2C10.99
+
+Download the shapefile
+
+
+```{r COH hoods}
+
+#   Read in the shapefiles 
+Neighborhoodpolys <- sf::read_sf(paste0(path,
+                    "/CityOfHouston_2022/COH_SUPER_NEIGHBORHOODS.shp"))
+
+temp <- Neighborhoodpolys %>% select(SNBNAME, geometry)
+summary(temp) # check to see what it looks like. Could also do plot(temp)
+#  SNBNAME                   geometry 
+# Length:88          POLYGON      :88  
+# Class :character   epsg:4326    : 0  
+# Mode  :character   +proj=long...: 0  
+st_crs(temp) <- googlecrs
+
+temp <-temp %>% rename(Name=SNBNAME)
+
+saveRDS(temp, paste0(path, "Neighborhood_polys_COH.rds"))
+
+
+leaflet(temp) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons()
+
+```
+
+
+
+##        Harris County city boundaries
+
+Looks good, looks watertight and comprehensive. Possibly the most useful
+set of neighborhoods for many purposes.
+
+From Kinder Institute,
+Harris County Appraisal District. (2020). Boundaries of Cities in Harris County.
+[Data set]. Rice University-Kinder Institute: UDP. https://www.kinderudp.org/#/datasetCatalog/3xmql87o2y1v 
+
+
+```{r County cities}
+
+#   Read in the shapefiles 
+CityPolys <- sf::read_sf(paste0(path,
+                    "/CitiesInCounty/City.shp"))
+
+temp <- CityPolys %>% select(name, geometry)
+summary(temp) # check to see what it looks like. 
+ #     name                    geometry 
+ # Length:34          MULTIPOLYGON :34  
+ # Class :character   epsg:NA      : 0  
+ # Mode  :character   +proj=lcc ...: 0  
+
+#   Data is projected NAD_1983, Lambert
+
+#   So let's convert to lat long
+
+fgdb <- paste0(path, "CitiesInCounty/City.dbf")
+
+# Read the feature class
+temp <- sf::st_read(fgdb)
+
+#   unproject the zipcode data to lat longs on proper datum
+
+templatlong <- st_transform(temp, googlecrs)
+summary(templatlong)
+ #     code               name             GlobalID           Shape_area       
+ # Length:34          Length:34          Length:34          Min.   :1.816e+06  
+ # Class :character   Class :character   Class :character   1st Qu.:3.761e+07  
+ # Mode  :character   Mode  :character   Mode  :character   Median :5.833e+07  
+ #                                                          Mean   :6.691e+08  
+ #                                                          3rd Qu.:1.610e+08  
+ #                                                          Max.   :1.704e+10  
+ #   Shape_len                geometry 
+ # Min.   :   9867   MULTIPOLYGON :34  
+ # 1st Qu.:  32456   epsg:4326    : 0  
+ # Median :  41616   +proj=long...: 0  
+ # Mean   : 191784                     
+ # 3rd Qu.:  79534                     
+ # Max.   :3567219                     
+
+saveRDS(templatlong, paste0(path, "City_polys.rds"))
+
+
+leaflet(templatlong) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons()
+
+```
+
+
 
 
 
