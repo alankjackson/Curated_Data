@@ -186,13 +186,39 @@ https://gishub-h-gac.hub.arcgis.com/datasets/H-GAC::fema-floodplains-nfhl-2015/e
 
 Shapefile
 
-Download May 6, 2022 - failed....
+Download May 7, 2022
 -------------------------------
 Neighborhoods
 
-Downloaded from wikimapia Feb 2018
+Downloaded from wikimapia May 7, 2022
 
 Polygons and labels
+-------------------------------
+Neighborhoods
+
+COH Super Neighborhoods
+
+https://cohgis-mycity.opendata.arcgis.com/datasets/deae15e7f3db4b198946c17f0d169c39/explore?location=29.721674%2C-95.357101%2C10.99
+
+Downloaded May 8, 2022
+
+-------------------------------
+City boundaries in Harris county
+
+https://www.kinderudp.org/#/datasetCatalog/3xmql87o2y1v 
+
+Downloaded May 8, 2022
+
+-------------------------------
+Voting precincts in Harris County
+
+https://cohgis-mycity.opendata.arcgis.com/datasets/17b4595d76e64b01aebce51e4340b858/explore?location=29.838977%2C-95.436800%2C10.59
+
+Downloaded May 8, 2022
+
+-------------------------------
+-------------------------------
+-------------------------------
 -------------------------------
 
 
