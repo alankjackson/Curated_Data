@@ -65,9 +65,14 @@ summary(temp) # check to see what it looks like. Could also do plot(temp)
 #   set CRS. Since Wikimapia is based on Google maps photos, CRS is 
 #   same as Google.
 sf::st_crs(temp) <- googlecrs
-#   turn lines into polygons
-###temp <- sf::st_polygonize(temp)
-###temp <- sf::st_as_sf(temp)
+#   turn lines into polygons and calculate area
+temp2 <- sf::st_polygonize(temp) %>% 
+  mutate(Shape_area=sf::st_area(.)) %>% 
+  select(Name, Shape_area)  
+
+#   Bind area back onto original
+
+temp <- cbind(temp, temp2, by="Name")
 
 # But first fix a few issues
 temp$Name <- str_replace(temp$Name,"&#039;","'")
@@ -84,7 +89,7 @@ temp2 <- temp %>%
   mutate(Short_name=str_remove(Short_name, " [Nn]eighborhood")) %>% 
   mutate(Short_name=str_replace(Short_name, " Section", " Sec")) %>% 
   mutate(Short_name=str_remove(Short_name, "\\(South Briar Community Association")) %>% 
-  select(Name, Short_name, descriptio, geometry)
+  select(Name, Short_name, descriptio, Shape_area, geometry)
 #   turn lines into polygons
 ###temp2 <- sf::st_polygonize(temp2)
 
@@ -129,7 +134,7 @@ Download the shapefile
 Neighborhoodpolys <- sf::read_sf(paste0(path,
                     "/CityOfHouston_2022/COH_SUPER_NEIGHBORHOODS.shp"))
 
-temp <- Neighborhoodpolys %>% select(SNBNAME, geometry)
+temp <- Neighborhoodpolys %>% select(SNBNAME, ShapeSTAre, geometry)
 summary(temp) # check to see what it looks like. Could also do plot(temp)
 #  SNBNAME                   geometry 
 # Length:88          POLYGON      :88  
@@ -137,7 +142,7 @@ summary(temp) # check to see what it looks like. Could also do plot(temp)
 # Mode  :character   +proj=long...: 0  
 st_crs(temp) <- googlecrs
 
-temp <-temp %>% rename(Name=SNBNAME)
+temp <-temp %>% rename(Name=SNBNAME, Shape_area=ShapeSTAre)
 
 saveRDS(temp, paste0(path, "Neighborhood_polys_COH.rds"))
 
@@ -201,6 +206,9 @@ summary(templatlong)
  # Mean   : 191784                     
  # 3rd Qu.:  79534                     
  # Max.   :3567219                     
+
+templatlong <- templatlong %>% 
+  select(name, Shape_area, geometry)
 
 saveRDS(templatlong, paste0(path, "City_polys.rds"))
 
