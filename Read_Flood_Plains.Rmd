@@ -7,9 +7,32 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(leaflet)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Flood_Plains/"
 
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+##    Downloaded from H-GAC
+
+Hard to download. Kept failing, took many tweaks to get it to work. A very
+non-intuitive interface (thank you Arcgis).
+
+```{r read and plot}
+
+fgdb <- paste0(path, "FEMA_Floodplains_NFHL_2015.dbf")
+
+# Read the feature class
+temp <- sf::st_read(fgdb)
+
+summary(temp)
+#   Good epsg
+
+leaflet(temp) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons()
+
 ```
 
