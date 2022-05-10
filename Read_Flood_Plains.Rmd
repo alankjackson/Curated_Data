@@ -9,6 +9,8 @@ output: html_document
 library(tidyverse)
 library(leaflet)
 
+googlecrs <- 4326
+
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Flood_Plains/"
 
 knitr::opts_chunk$set(echo = TRUE)
@@ -25,14 +27,31 @@ fgdb <- paste0(path, "FEMA_Floodplains_NFHL_2015.dbf")
 
 # Read the feature class
 temp <- sf::st_read(fgdb)
+sf::st_crs(temp) <- googlecrs
 
 summary(temp)
 #   Good epsg
 
-leaflet(temp) %>% 
+#     Data is for 1:10,000 scale = 10m resolution
+#     Let's make a 100 m dataset as well.
+
+saveRDS(temp, paste0(path, "FEMA_Floodplains_NFHL_2015_full_resolution.Rds"))
+
+#     Simplify, but first transform to XY
+
+foo <- sf::st_transform(temp, crs=Local_crs)
+
+#foo_simple <- sf::st_simplify(foo, dTolerance = 100)
+foo_simple <- rmapshaper::ms_simplify(foo, keep = 0.1,
+                                keep_shapes = FALSE)
+
+foo_simple <- sf::st_transform(foo_simple, crs=googlecrs)
+
+leaflet(foo_simple) %>% 
   leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
   addTiles() %>% 
   addPolygons()
 
+saveRDS(foo_simple, paste0(path, "FEMA_Floodplains_NFHL_2015_100m_resolution.Rds"))
 ```
 
