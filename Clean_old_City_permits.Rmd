@@ -1,0 +1,32 @@
+---
+title: "Load_clean_old_permit_data"
+author: "Alan Jackson"
+date: '2022-05-10'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(postmastr)
+library(GeocodeHou)
+
+savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Permits/"
+
+infile <- "/home/ajackson/Dropbox/Rprojects/CityPermits/COH_PERMITS_STRUCTURAL_BLDG.csv"
+
+permits <- read_csv(infile)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  Old permits
+
+The city only posts permit data from 2017 on their website now, but a few years
+ago I downloaded data going back to 2013. So I will read in this older data,
+and re-clean it and make it compatible with the new data.
+
+
+
+
+
+
