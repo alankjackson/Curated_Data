@@ -25,8 +25,282 @@ The city only posts permit data from 2017 on their website now, but a few years
 ago I downloaded data going back to 2013. So I will read in this older data,
 and re-clean it and make it compatible with the new data.
 
+```{r clean 1}
+
+#   Toss unneeded fields, then we can try to find lat longs
+
+permits <- permits %>% 
+  select(X, Y, OBJECTID, Match_addr, Address=ARC_Street,
+         Street_num=SITUS_STR_NO, Prefix=SITUS_PRE_DIR, 
+         Street_name=SITUS_STR_NAME, Street_type=SITUS_STR_TYPE,
+         Zipcode=SITUS_ZIP_CODE, Comments=PROJ_DESC, Date=APPLN_DATE) %>% 
+  replace_na(list(Prefix="", Street_type=""))
+
+permits <- permits %>% # head(5000) %>% 
+#   get rid of extra white space
+       mutate(Address=str_squish(Address)) %>% 
+#   get rid of address like 325 1/2. Get rid of the fraction
+       string_replace( "Address", "^(\\d+)\\s?\\d/\\d ", "\\1 ", "Apply") %>% 
+#   Collapse farm roads 
+       string_replace("Output", " F M ", " FM ", "Apply") %>% 
+#   change & to AND
+       string_replace("Output", "&", "AND", "Apply") %>% 
+#   Remove BLD (Building) designator
+       string_replace("Output", " BLD\\s?[\\w]+$", "", "Apply") %>% 
+#   Take care of Buffalo Speedway
+       string_replace("Output", "BUFFALO SPEEDWAY", "BUFFALO SPWY", "Apply") %>% 
+#   streets designated are Private are special and hard to geocode.
+#   We will remove that designation, but then flag it in a comments column
+  mutate(Special=ifelse(str_detect(Address, "\\(PVT\\)"), "Private", "")) %>% 
+#   Remove anything in parenthesis
+       string_replace("Output", "\\(.+\\)", "", "Apply") %>% 
+#   Remove "A AND B"
+       string_replace("Output", " A\\s?AND\\s?B", "", "Apply") %>% 
+#   Remove "FL" for Floor
+       string_replace("Output", " FL[R]?\\s?\\w+$", " ", "Apply") %>% 
+#   Remove "STE" for Suite
+       string_replace("Output", " STE [A-Z0-9-\\.]+$", " ", "Apply") %>% 
+#   Remove "." but carefully. Collapse extra white space afterwards
+       mutate(Output=str_replace_all(Output, "\\.", " ")) %>% 
+       mutate(Output=str_squish(Output)) %>%  
+#   Remove stuff with dashes in them except John-A
+       mutate(Output=str_replace(Output, "JOHN-A", "JOHN:A")) %>% 
+       string_replace("Output", " [\\w]+-[\\w]+$", "", "Apply") %>% 
+       mutate(Output=str_replace(Output, "JOHN:A", "JOHN-A")) %>% 
+#   Convert ST to SAINT
+       string_replace("Output", "^(\\d+) ST ", "\\1 SAINT ", "Apply") %>% 
+       string_replace("Output", "^(\\d+ [NSEW]) ST ", "\\1 SAINT ", "Apply") %>% 
+#   Correct Parkway abbreviation
+       string_replace("Output", " PKY", " PKWY", "Apply") %>% 
+#   Correct Plaza streets
+       string_replace("Output", 
+                      "(LAWNDALE|LOVE|GREENWAY|MEYERLAND|WILCREST) PLAZA", 
+                      "\\1 PLZ", "Apply") %>% 
+#   Clean up stuff added to AVENUE
+     string_replace("Output", "AVENUE ([A-Z]{1}) .+", "AVENUE \\1", "Apply") %>%   
+#   Clean up stuff added to Riverway
+       string_replace("Output", "RIVERWAY \\d+", "RIVERWAY", "Apply") %>%  
+#   Clean up Sam Houston Pkwy
+       string_replace("Output", "SAM HOUSTON NORTH", "SAM HOUSTON", "Apply") %>%  
+       string_replace("Output", "SAM HOUSTON SOUTH", "SAM HOUSTON", "Apply") %>%  
+       string_replace("Output", "SAM HOUSTON EAST",  "SAM HOUSTON", "Apply") %>%  
+       string_replace("Output", "SAM HOUSTON WEST",  "SAM HOUSTON", "Apply") %>%   
+#   Repair staff sgt macario
+       string_replace("Output", "S/SGT MACARIO", "SSGT MACARIO", "Apply") %>%  
+#   Repair avenida
+       string_replace("Output", "AMERICAS .+$", "AMERICAS", "Apply") %>% 
+#   Repair el camino real
+       string_replace("Output", "EL CAMINO REAL .+$", "EL CAMINO REAL", "Apply") %>% 
+#   Repair LOOP
+       string_replace("Output", "NORTH LOOP .+$", "NORTH LOOP FWY", "Apply") %>% 
+       string_replace("Output", "SOUTH LOOP .+$", "SOUTH LOOP FWY", "Apply") %>% 
+       string_replace("Output", "EAST LOOP .+$", "EAST LOOP FWY", "Apply") %>% 
+       string_replace("Output", "WEST LOOP .+$", "WEST LOOP FWY", "Apply") 
+
+Types <- paste(c(" ALY", "AVE", "BLF", "BLVD", "BND", "BR", "BRG", "BRK", 
+                 "BYP", "CIR",  "COR", "CRES", "CRK", "CRST", "CT", "CTR",
+                 "CTS", "CV", "CYN", "DL", "DR",  "DRS", "EST", "ESTS",
+                  "EXT", "FLD", "FLS", "FRK", "FRST", "FRY", "FWY", "GDN", 
+                  "GDNS", "GLN", "GRN", "GRV", "HBR", "HL", "HLS", "HOLW",
+                  "HTS", "HVN", "HWY",  "INLT", "IS", "KNL", "KNLS", "LDG",
+                  "LK", "LKS", "LN", "LNDG", "MDW", "MDWS",
+                  "ML", "MNR", "MT", "MTN", "PATH", "PKWY",
+                  "PL",  "PLZ", "PNE", "PNES", "PR", "PRT", "PSGE", "PT",
+                  "RD", "RDG", "RIV", "RST", "SHR", "SHRS",
+                  "SPG", "SPUR", "SPWY", "SQ", "ST", "STA", "STRM", "TER",
+                  "TRCE", "TRL", "VIS", "VL", "VLG", "VLY", "VW", "WALK",
+                  "WLS",  "XING"), collapse="| ")
+# 
+ permits <- permits %>% 
+   string_replace("Output", paste0("( ",Types,") .+$"), "\\1", "Apply")  
+
+ More_types <- " MALL| WAY| PLACE"
+ 
+ permits <- permits %>% 
+   string_replace("Output", paste0("(",More_types,") \\w?\\d+$"), "\\1", "Apply")  
+ 
+ 
+Farm_roads <- "FM 1960|FM 2100|FM 2351|FM 529|FM 2920|FM 1485|FM 2855|FM 1093|FM 2234|FM 362|FM 1942|FM 1314|FM 1463|FM 723|FM 1464|FM 686|FM 2978|FM 528|FM 521 |FM 1098|FM 149|FM 1959|FM 359|FM 1488|FM 249|FM 2917|FM 1736|FM 526"
+
+permits <- permits %>% 
+  string_replace("Output", paste0("(",Farm_roads,") .+$"), "\\1", "Apply")
+
+```
+
+##        parse addresses
+
+```{r parse}
+
+foo <- permits
+
+pm_dictionary(type = "state", filter = c("TX"), case = "title", locale = "us")
+dirs <- pm_dictionary(type = "directional", 
+                      filter = c("N", "S", "E", "W"), locale = "us")
+TX <- pm_dictionary(type = "state", filter = "TX", 
+                    case = c("title", "upper"), locale = "us")
+
+hou <- pm_append(type="suffix", input=c("SPEEDWAY", "SPWY", "PLACE"), 
+                 output=c("SPWY", "SPWY", "PL"))
+Type_dict <- pm_dictionary(type="suffix", append=hou, case="upper")
+
+foo <- pm_identify(foo, var="Output") # add ID fields
+
+foo2 <- pm_prep(foo, var="Output", type="street") # Prep data
+
+foo2 <- pm_houseFrac_parse(foo2)
+
+foo2 <- pm_house_parse(foo2)
+
+foo2 <- pm_streetDir_parse(foo2, dirs)
+
+foo2 <- pm_streetSuf_parse(foo2, Type_dict)
+ 
+foo2 <- pm_street_parse(foo2)
+
+foo2 <- foo2 %>% 
+  mutate(pm.street=str_replace(pm.street, " 1 At 2", " 1/2")) 
+
+foo2 <- foo2 %>% 
+  mutate(pm.street=str_to_upper(pm.street)) %>% 
+  mutate(pm.streetSuf=str_to_upper(pm.streetSuf)) %>% 
+  mutate(pm.preDir=replace_na(pm.preDir, "")) %>% 
+  mutate(pm.streetSuf=replace_na(pm.streetSuf, ""))
+
+foo <- pm_replace(foo2, source=foo)
+  
+```
 
 
 
 
+```{r geocode}
+
+Exact_match <- NULL
+Failed_match <- NULL
+
+for (i in 1:nrow(permits)){ # first look for exact matches
+#for (i in 1:1000){ # first look for exact matches takes about 1 minute
+  if (i%%1000==0) { print(paste("---",i,"---")) }
+  tmp <- match_exactly(foo[i,]$pm.house, foo[i,]$pm.preDir,
+                       foo[i,]$pm.street,
+                       foo[i,]$pm.streetSuf, foo[i,]$Zipcode)
+  if (tmp$Success){ #   success
+    Exact_match <- cbind(foo[i,], tmp) %>% 
+      select(OBJECTID, pm.house, pm.preDir, pm.street, pm.streetSuf, 
+             Zipcode, Lat, Lon) %>% 
+      rbind(., Exact_match)
+  } else { #  Fail exact match
+    Failed_match <- cbind(foo[i,], tmp) %>% 
+      select(OBJECTID, pm.house, pm.preDir, pm.street, pm.streetSuf, 
+             Zipcode, Fail, Lat, Lon) %>% 
+      rbind(., Failed_match)
+  }
+}
+
+#saveRDS(Exact_match, paste0(savepath, "Keep_Exactmatch_oldpermits.rds"))
+#saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits.rds"))
+
+```
+
+
+
+```{r bad zip}
+
+Failed_match <- Failed_match %>% mutate(Correction=NA)
+
+for (i in 1:nrow(Failed_match)){
+  if (i%%100==0) { print(paste("---",i,"---")) }
+  target <- Failed_match[i,]
+  tmp <- repair_zipcode(target$pm.house, target$pm.preDir, target$pm.street,
+                       target$pm.streetSuf, target$Zipcode)
+  if (tmp$Success){ #   success
+    Failed_match[i,]$Lat <- tmp$Lat
+    Failed_match[i,]$Lon <- tmp$Lon
+    Failed_match[i,]$Fail <- paste(Failed_match[i,]$Fail, "Zipcode")
+    Failed_match[i,]$Correction <- tmp$New_zipcode
+  } 
+}
+
+```
+
+
+```{r bad names}
+
+for (i in 1:nrow(Failed_match)){
+  if (Failed_match[i,]$Fail!="Street_name") {next} # skip if name isn't the issue
+  if (Failed_match[i,]$Lat > 0) {next} # skip if zipcode resolved it
+  if (i%%10==0) { print(paste("---",i,"---")) }
+  target <- Failed_match[i,]
+  tmp <- repair_name(target$pm.house, target$pm.preDir, target$pm.street,
+                       target$pm.streetSuf, target$Zipcode)
+  if (tmp$Success){ #   success
+    Failed_match[i,]$Lat <- tmp$Lat
+    Failed_match[i,]$Lon <- tmp$Lon
+    Failed_match[i,]$Correction <- tmp$New_name
+  } else {
+    Failed_match[i,]$Fail <- paste("Street_name",tmp$Fail)
+  }
+}
+
+```
+
+```{r bad types}
+
+for (i in 1:nrow(Failed_match)){
+  if (Failed_match[i,]$Fail!="Street_type") {next} # skip if type isn't the issue
+  if (i%%10==0) { print(paste("---",i,"---")) }
+  target <- Failed_match[i,]
+  tmp <- repair_type(target$pm.house, target$pm.preDir, target$pm.street,
+                       target$pm.streetSuf, target$Zipcode)
+  if (tmp$Success){ #   success
+    Failed_match[i,]$Lat <- tmp$Lat
+    Failed_match[i,]$Lon <- tmp$Lon
+    Failed_match[i,]$Correction <- tmp$New_type
+  } else {
+    Failed_match[i,]$Fail <- paste("Street_type",tmp$Fail)
+  }
+}
+
+```
+
+
+```{r bad numbers}
+
+
+for (i in 1:nrow(Failed_match)){
+  if (Failed_match[i,]$Fail!="Street_num") {next} # skip if name isn't the issue
+  if (i%%10==0) { print(paste("---",i,"---")) }
+  target <- Failed_match[i,]
+  tmp <- repair_number(target$pm.house, target$pm.preDir, target$pm.street,
+                       target$pm.streetSuf, target$Zipcode)
+  if (tmp$Success){ #   success
+    Failed_match[i,]$Lat <- tmp$Lat
+    Failed_match[i,]$Lon <- tmp$Lon
+    Failed_match[i,]$Correction <- tmp$Result
+  } else {
+    Failed_match[i,]$Fail <- paste("Street_num",tmp$Fail)
+  }
+}
+
+```
+
+```{r bad prefix}
+
+for (i in 1:nrow(Failed_match)){
+  if (Failed_match[i,]$Fail!="Prefix") {next} # skip if name isn't the issue
+  if (i%%10==0) { print(paste("---",i,"---")) }
+  target <- Failed_match[i,]
+  tmp <- repair_prefix(target$pm.house, target$pm.preDir, target$pm.street,
+                       target$pm.streetSuf, target$Zipcode)
+  if (tmp$Success){ #   success
+    Failed_match[i,]$Lat <- tmp$Lat
+    Failed_match[i,]$Lon <- tmp$Lon
+    Failed_match[i,]$Correction <- tmp$New_prefix
+  } else {
+    Failed_match[i,]$Fail <- paste("Prefix",tmp$Fail)
+  }
+}
+
+
+```
 
