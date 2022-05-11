@@ -186,7 +186,7 @@ summary(temp) # check to see what it looks like.
 fgdb <- paste0(path, "CitiesInCounty/City.dbf")
 
 # Read the feature class
-temp <- sf::st_read(fgdb)
+temp2 <- sf::st_read(fgdb)
 
 #   unproject the zipcode data to lat longs on proper datum
 
