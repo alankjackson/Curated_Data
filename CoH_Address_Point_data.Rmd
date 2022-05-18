@@ -1223,6 +1223,7 @@ foobar <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>%
   mutate(change=paste("Corrected street name to", 
                        dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Street_name)) 
 corrections <- bind_rows(corrections, foobar)
+saveRDS(corrections, paste0(path, "Final_corrections.Rds"))
 
 ```
 
