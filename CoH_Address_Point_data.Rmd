@@ -56,6 +56,7 @@ df %>% select(OBJECTID) %>%
 
 df %>% select(OBJECTID) %>% 
   mutate(Objectid = as.integer(OBJECTID)) %>% 
+  unique() %>% 
   count()
   
 # ID (same question)
@@ -65,12 +66,22 @@ df %>% select(ID) %>%
   ggplot() +
   geom_histogram(aes(x=Id))
 
+df %>% select(ID) %>% 
+  mutate(Objectid = as.integer(ID)) %>% 
+  unique() %>% 
+  count()
+
 # ADDR_ID (same question)
 
 df %>% select(ADDR_ID) %>% 
   mutate(Addr_id = as.integer(ADDR_ID)) %>% 
   ggplot() +
   geom_histogram(aes(x=Addr_id))
+
+df %>% select(ADDR_ID) %>% 
+  mutate(Objectid = as.integer(ADDR_ID)) %>% 
+  unique() %>% 
+  count()
 
 # TYPES
 
@@ -129,7 +140,9 @@ tmp <-   dfnew %>%
   filter(Street_num>49999) %>% 
   mutate(change="STREET_NUM > 49999, which fails in spot checks") %>% 
   select(-Street_num, -Street_alpha)
+
 corrections <- bind_rows(corrections, tmp)
+
 dfnew <- dfnew %>% 
   mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
   filter(Street_num<49999)  
@@ -178,6 +191,7 @@ tmp <- dfnew %>%
   filter(str_detect(PREFIX, "[a-z]|[^NSEW]")) %>% 
   mutate(change="PREFIX not one of N,S,E,W") %>% 
   select(-Street_num, -Street_alpha)
+
 corrections <- bind_rows(corrections, tmp)
 
 dfnew <- 
