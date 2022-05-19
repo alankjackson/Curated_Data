@@ -125,6 +125,12 @@ Farm_roads <- "FM 1960|FM 2100|FM 2351|FM 529|FM 2920|FM 1485|FM 2855|FM 1093|FM
 permits <- permits %>% 
   string_replace("Output", paste0("(",Farm_roads,") .+$"), "\\1", "Apply")
 
+#   Why some addresses have a spurious number between the street number and
+#   street name is a mystery. # of units?
+
+permits <- permits %>% 
+  mutate(Output=str_replace(Output, " [13567] ", " "))
+
 ```
 
 ##        parse addresses
@@ -178,9 +184,10 @@ foo <- pm_replace(foo2, source=foo)
 Exact_match <- NULL
 Failed_match <- NULL
 
+ttt <- lubridate::now()
 for (i in 1:nrow(permits)){ # first look for exact matches
 #for (i in 1:1000){ # first look for exact matches takes about 1 minute
-  if (i%%1000==0) { print(paste("---",i,"---")) }
+  if (i%%1000==0) { print(paste("---",i,"---", lubridate::now()-ttt)) }
   tmp <- match_exactly(foo[i,]$pm.house, foo[i,]$pm.preDir,
                        foo[i,]$pm.street,
                        foo[i,]$pm.streetSuf, foo[i,]$Zipcode)
@@ -197,8 +204,8 @@ for (i in 1:nrow(permits)){ # first look for exact matches
   }
 }
 
-#saveRDS(Exact_match, paste0(savepath, "Keep_Exactmatch_oldpermits.rds"))
-#saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits.rds"))
+saveRDS(Exact_match, paste0(savepath, "Keep_Exactmatch_oldpermits.rds"))
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits.rds"))
 
 ```
 
@@ -221,15 +228,18 @@ for (i in 1:nrow(Failed_match)){
   } 
 }
 
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits2.rds"))
 ```
 
 
 ```{r bad names}
 
+ttt <- lubridate::now()
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Street_name") {next} # skip if name isn't the issue
   if (Failed_match[i,]$Lat > 0) {next} # skip if zipcode resolved it
-  if (i%%10==0) { print(paste("---",i,"---")) }
+  #if (i%%10==0) { print(paste("---",i,"---")) }
+  if (i%%100==0) { print(paste("---",i,"---",nrow(Failed_match)/i*(lubridate::now()-ttt))) }
   target <- Failed_match[i,]
   tmp <- repair_name(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -241,6 +251,7 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Fail <- paste("Street_name",tmp$Fail)
   }
 }
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits3.rds"))
 
 ```
 
@@ -248,7 +259,7 @@ for (i in 1:nrow(Failed_match)){
 
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Street_type") {next} # skip if type isn't the issue
-  if (i%%10==0) { print(paste("---",i,"---")) }
+  if (i%%100==0) { print(paste("---",i,"---")) }
   target <- Failed_match[i,]
   tmp <- repair_type(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -260,6 +271,7 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Fail <- paste("Street_type",tmp$Fail)
   }
 }
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits4.rds"))
 
 ```
 
@@ -282,6 +294,7 @@ for (i in 1:nrow(Failed_match)){
   }
 }
 
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits5.rds"))
 ```
 
 ```{r bad prefix}
@@ -302,5 +315,56 @@ for (i in 1:nrow(Failed_match)){
 }
 
 
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_oldpermits6.rds"))
 ```
+
+
+```{r near final}
+
+#   Combine all the files and produce a final failure file that we can try a few
+#   more tricks with.
+
+saveRDS(Exact_match, paste0(savepath, "Keep_Exactmatch_oldpermits_final.rds"))
+saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch_old_permits_final.rds"))
+
+Final <- left_join(foo, select(Exact_match, OBJECTID, Lat, Lon), by="OBJECTID")
+
+Final <- left_join(Final,
+                   select(Failed_match, OBJECTID, Lat, Lon, Fail, Correction),
+                   by="OBJECTID")
+
+Final <- Final %>% 
+  rowwise() %>% 
+  mutate(Lat.x=ifelse(is.null(Lat.x), Lat.y, Lat.x)) %>% 
+  mutate(Lon.x=ifelse(is.null(Lon.x), Lon.y, Lon.x)) %>% 
+  rename(Lon=Lon.x, Lat=Lat.x) %>% 
+  select(-Lat.y, -Lon.y)
+
+saveRDS(Final, paste0(savepath, "Clean_Final_1989_2019.rds"))
+
+```
+
+
+##        Let's look at the overlap and coordinates
+
+```{r}
+
+foo <- Final %>% 
+  mutate(Dlat=Y-Lat, Dlon=X-Lon,
+         dist=round(sqrt((Dlon*364173)**2 +
+                         (Dlat*364000)**2))) %>% 
+  select(dist, Dlat, Dlon, Lat, Lon, Y, X, Match_addr, Output, Address) %>% 
+  filter(Lat>0)
+
+foo %>% filter(dist<1000) %>% 
+  ggplot() +
+  geom_histogram(aes(x=dist))
+
+```
+
+
+
+
+
+
 
