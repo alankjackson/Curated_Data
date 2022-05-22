@@ -217,6 +217,11 @@ https://cohgis-mycity.opendata.arcgis.com/datasets/17b4595d76e64b01aebce51e4340b
 Downloaded May 8, 2022
 
 -------------------------------
+Texas votes by county in the 2020 presidential election
+
+Downloaded from secretary of state website
+
+
 -------------------------------
 -------------------------------
 -------------------------------
