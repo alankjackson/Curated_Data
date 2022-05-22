@@ -1,0 +1,38 @@
+---
+title: "Load 2020 Election data"
+author: "Alan Jackson"
+date: '2022-05-22'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+DataVotes <- "/home/ajackson/Dropbox/Rprojects/Voting/"
+savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Voting_stuff/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##  Load data
+
+```{r}
+
+#   Build Votes by county tibble
+
+Votes <- read_csv(paste0(DataVotes, 
+                         "CountybyCountyCanvassReport2020Pres.csv")) %>% 
+  rename(Candidate="CANDIDATE NAME", 
+         "Office"="OFFICE NAME", 
+         "County"="COUNTY NAME",
+         Votes="TOTAL VOTES PER OFFICE PER COUNTY") #%>% 
+  # filter(grepl("BIDEN|TRUMP", Candidate)) %>% 
+  # select(Candidate, County, Votes) %>% 
+  # pivot_wider(names_from=Candidate, values_from=Votes) %>% 
+  # rename(Biden=2, Trump=3) %>% 
+  # mutate(Blueness=Biden/(Biden+Trump))
+
+saveRDS(Votes, paste0(savepath, "CountybyCountyCanvassReport2020Pres.rds"))
+
+```
+
