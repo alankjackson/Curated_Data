@@ -8,7 +8,48 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/CDC_Wonder/"
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+
+```{r load}
+
+df <- read_tsv(
+  paste0(path, "Provisional Mortality Statistics, 2018 through Last Month.txt"),
+  col_types="-cccccci")
+
+
+```
+
+##        Cleanup
+
+```{r cleanup}
+
+df$Month_Code <- df$"Month Code"
+df$"Month Code" <- NULL
+df$"Year Code" <- NULL
+
+df <- df %>% 
+  select(-Year, -Month) %>% 
+  mutate(Month=lubridate::ym(Month_Code)) %>% 
+  select(-Month_Code) %>% 
+  filter(Month<lubridate::ym("2022/04")) # April is incomplete
+
+```
+
+##        Save
+
+```{r save}
+
+saveRDS(df, paste0(path, "Texas_Deaths_Jan2018-Mar2022.rds"))
+
+```
+
+
+
+
+
+
 
