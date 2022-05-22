@@ -1,0 +1,14 @@
+---
+title: "Load CDC Wonder data"
+author: "Alan Jackson"
+date: '2022-05-22'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
