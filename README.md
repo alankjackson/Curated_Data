@@ -223,6 +223,15 @@ Downloaded from secretary of state website
 
 
 -------------------------------
+Mortality data from CDC
+
+Using CDC Wonder, download provisional mortality data for Texas by county
+and month for January 2018 - April 15 2022. 
+
+https://wonder.cdc.gov/
+
+Downloaded May 21, 2022.
+
 -------------------------------
 -------------------------------
 
