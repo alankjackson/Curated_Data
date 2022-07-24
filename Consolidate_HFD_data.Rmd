@@ -115,19 +115,56 @@ B_bot <- (coords[2,5] - M_top*coords[2,4])[[1]]
 Delta_x_bot <- (coords[2,4]-coords[4,4])[[1]]/(81-13)
 Delta_y_bot <- (coords[2,5]-coords[4,5])[[1]]/(81-13)
 
+#   242E to 682W, (13,1) to (13,71)  Left vertical line
+
+Delta_x_lft <- (coords[1,4]-coords[2,4])[[1]]/(71-1)
+Delta_y_lft <- (coords[1,5]-coords[2,5])[[1]]/(71-1)
+
+#   259E to 699W, (81,1) to (81,71)  Right vertical line
+
+Delta_x_rgt <- (coords[3,4]-coords[4,4])[[1]]/(71-1)
+Delta_y_rgt <- (coords[3,5]-coords[4,5])[[1]]/(71-1)
+
 #   Build table of grid names to X-Y
 
 Key_num <- 242
 Key_alpha <- 'E'
 
-Key_2_LL <- function(Num, Alpha) {
+IJ_2_Key <- function(I, J) {
+  #     Convert an I,J value into a Keymap code
+  
+Letters <- c("A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M",
+             "N", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z") 
+  
+  Num <- case_when( 
+    J < 73 ~ floor((J-1)/6)*40 + 239,
+    J < 79 ~ floor((J-73)/6)*36 + 715,
+    J < 85 ~ floor((J-79)/6)*34 + 749,
+    TRUE   ~ floor((J-85)/6)*34 + 783
+  )
+  
+  Num <- Num + floor((I-1)/4+0.1)
+  
+  Frac <- case_when( 
+    J < 73 ~ (((J-1)/6)%%1)*6,
+    J < 79 ~ (((J-73)/6)%%1)*6,
+    J < 85 ~ (((J-79)/6)%%1)*6,
+    TRUE   ~ (((J-85)/6)%%1)*6
+  )
+  
+ #c(Num, Frac) 
+ L_val <- Letters[as.integer(((I-1)%%4+1)+Frac*4 + 0.1)]
+ c(Num, L_val)
+}
+
+Key_2_IJ <- function(Num, Alpha) {
   Alpha_addY <- case_when(
-                Alpha %in% c("A", "B", "C", "D") ~ 0,
-                Alpha %in% c("E", "F", "G", "H") ~ 1,
-                Alpha %in% c("J", "K", "L", "M") ~ 2,
-                Alpha %in% c("N", "P", "Q", "R") ~ 3,
-                Alpha %in% c("S", "T", "U", "V") ~ 4,
-                Alpha %in% c("W", "X", "Y", "Z") ~ 5
+                Alpha %in% c("A", "B", "C", "D") ~ 1,
+                Alpha %in% c("E", "F", "G", "H") ~ 2,
+                Alpha %in% c("J", "K", "L", "M") ~ 3,
+                Alpha %in% c("N", "P", "Q", "R") ~ 4,
+                Alpha %in% c("S", "T", "U", "V") ~ 5,
+                Alpha %in% c("W", "X", "Y", "Z") ~ 6
               )
   Alpha_addX <- case_when(
                 Alpha %in% c("A", "E", "J", "N", "S", "W") ~ 0,
@@ -140,15 +177,23 @@ Key_2_LL <- function(Num, Alpha) {
     Y <- ((Num-((Num+1)%%40)-239)/40)*6 + Alpha_addY #  Y index 
   } else if (Num < 749) {
     X <- (Num-715)*4 + 1 + Alpha_addX #  X index 
-    Y <- 67 + Alpha_addY #  Y index 
+    Y <- 72 + Alpha_addY #  Y index 
   } else if (Num > 748) {
     X <- ((Num-749)%%34)*4 + 1 + Alpha_addX #  X index 
-    Y <- ((Num-((Num+1-749)%%34)-748)/34)*6 + 73 + Alpha_addY #  Y index 
+    Y <- ((Num-((Num+1-749)%%34)-748)/34)*6 + 78 + Alpha_addY #  Y index 
   }
   
   c(X,Y)
 }
 
+# test functions
+
+for (j in 1:90) {
+  i <- 92
+  Key_Let <- IJ_2_Key(i,j)
+  IJ <- Key_2_IJ(as.integer(Key_Let[1]), Key_Let[2])
+  print(c(i, j, Key_Let, IJ))
+}
 
 
 ```
