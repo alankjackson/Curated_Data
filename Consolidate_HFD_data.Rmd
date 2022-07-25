@@ -111,19 +111,19 @@ Delta_y_top <- (coords[1,5]-coords[3,5])[[1]]/(81-13)
 #   682W to 699W, (13,71) to (81,71) Bottom horizontal line
 
 M_bot <- (coords[2,5]-coords[4,5])[[1]]/(coords[2,4]-coords[4,4])[[1]]
-B_bot <- (coords[2,5] - M_top*coords[2,4])[[1]]
+B_bot <- (coords[2,5] - M_bot*coords[2,4])[[1]]
 Delta_x_bot <- (coords[2,4]-coords[4,4])[[1]]/(81-13)
 Delta_y_bot <- (coords[2,5]-coords[4,5])[[1]]/(81-13)
 
 #   242E to 682W, (13,1) to (13,71)  Left vertical line
 
-Delta_x_lft <- (coords[1,4]-coords[2,4])[[1]]/(71-1)
-Delta_y_lft <- (coords[1,5]-coords[2,5])[[1]]/(71-1)
+Delta_x_lft <- (coords[1,4]-coords[2,4])[[1]]/(72-1)
+Delta_y_lft <- (coords[1,5]-coords[2,5])[[1]]/(72-1)
 
 #   259E to 699W, (81,1) to (81,71)  Right vertical line
 
-Delta_x_rgt <- (coords[3,4]-coords[4,4])[[1]]/(71-1)
-Delta_y_rgt <- (coords[3,5]-coords[4,5])[[1]]/(71-1)
+Delta_x_rgt <- (coords[3,4]-coords[4,4])[[1]]/(72-1)
+Delta_y_rgt <- (coords[3,5]-coords[4,5])[[1]]/(72-1)
 
 #   Build table of grid names to X-Y
 
@@ -195,6 +195,29 @@ for (j in 1:90) {
   print(c(i, j, Key_Let, IJ))
 }
 
+#   Generate data frame of I, J, Number, Letter, X, Y
+
+#       Generate full arrays of the top and bottom X and Y coordinates
+
+X_top <- coords[1,4]$X+12*Delta_x_top - Delta_x_top*(0:96) # all good
+Y_top <- M_top*X_top + B_top # all good
+X_bot <- coords[2,4]$X+12*Delta_x_bot - Delta_x_bot*(0:96) # all good
+Y_bot <- M_bot*X_bot + B_bot # all good
+
+Translate_table <- tribble(~i, ~j, ~Num, ~Letter, ~X, ~Y)
+
+for (i in 1:97) {
+  Delta_x <- (X_top[i] - X_bot[i])/(72-2)
+  Delta_y <- (Y_top[i] - Y_bot[i])/(72-2)
+  print(paste("--->", i, Delta_x, Delta_y))
+  for (j in 1:85) {
+    Key_field <- IJ_2_Key(i, j)
+    Translate_table <- Translate_table %>% 
+      add_row(i=i, j=j, Num=Key_field[1], Letter=Key_field[2], 
+                               X=X_top[i]-(j-2)*Delta_x,
+                               Y=Y_top[i]-(j-2)*Delta_y)
+  }
+}
 
 ```
 
