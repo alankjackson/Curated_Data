@@ -1,0 +1,219 @@
+---
+title: "Create coordinate translation table"
+author: "Alan Jackson"
+date: '2022-07-27'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(sf)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/HFD_Incidents/"
+
+googlecrs <- 4326
+
+proj4string <-  "+proj=lcc +lat_1=28.38333333333333 +lat_2=30.28333333333333 +lat_0=27.83333333333333 +lon_0=-99 +x_0=600000 +y_0=3999999.999999999 +datum=NAD83 +units=us-ft +no_defs" # official current projection
+
+#   EPSG:32615
+proj4string_UTM <- "+proj=utm +zone=15 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"
+
+#   EPSG 26915
+proj4string_UTM2 <- "+proj=utm +zone=15 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+
+proj4string_NAD27 <- "+proj=utm +zone=15 +ellps=clrk66 +units=m +no_defs "
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r coordinates}
+
+#   Build the coordinate system translation
+
+## https://www.arcgis.com/apps/mapviewer/index.html?layers=a260ca81da954d1eb69baa8b95482082
+
+coords <- tribble(~Name,      ~Lat,       ~Lon,       ~X,     ~Y,
+                  "242E TL",  30.158112, -95.949444, 215922, 3339981,
+                  "682W BL",  29.395953, -95.933103, 215346, 3255433,
+                  "259E TR",  30.169313, -95.097453, 298027, 3339405,
+                  "699W BR",  29.407478, -95.087485, 297460, 3254899)
+
+Delta_Ynum <- 10*6+10
+Delta_Xnum <- 16*4+4
+
+DeltaY <-  (coords[1,]$Y - coords[2,]$Y)/Delta_Ynum/5280 * 3.28084
+DeltaY <-  (coords[3,]$Y - coords[4,]$Y)/Delta_Ynum/5280 * 3.28084
+DeltaX <-  (coords[3,]$X - coords[1,]$X)/Delta_Xnum/5280 * 3.28084
+DeltaX <-  (coords[4,]$X - coords[2,]$X)/Delta_Xnum/5280 * 3.28084
+  
+TL_BL <- coords[1,4:5] - coords[2,4:5]
+TR_BR <- coords[3,4:5] - coords[4,4:5]
+TR_TL <- coords[1,4:5] - coords[3,4:5]
+BR_BL <- coords[2,4:5] - coords[4,4:5]
+
+#   Convert lat/long to X/Y
+
+coords_UTM <- st_as_sf(x=coords, coords=c("Lon", "Lat"), crs=googlecrs)
+coords_UTM2 <- st_as_sf(x=coords, coords=c("Lon", "Lat"), crs=googlecrs)
+coords_UTM3 <- st_as_sf(x=coords, coords=c("Lon", "Lat"), crs=googlecrs)
+coords_LAM <- st_as_sf(x=coords, coords=c("Lon", "Lat"), crs=googlecrs)
+
+coords_UTM <- st_transform(coords_UTM, crs=proj4string_UTM) 
+coords_UTM2 <- st_transform(coords_UTM2, crs=proj4string_NAD27) 
+coords_UTM3 <- st_transform(coords_UTM3, crs=proj4string_UTM2) 
+coords_LAM <- st_transform(coords_LAM, crs=proj4string) 
+
+coords_UTM$X - unlist(coords_UTM$geometry)[c(1,3,5,7)]
+coords_UTM$Y - unlist(coords_UTM$geometry)[c(2,4,6,8)]
+coords_UTM2$X - unlist(coords_UTM2$geometry)[c(1,3,5,7)]
+coords_UTM2$Y - unlist(coords_UTM2$geometry)[c(2,4,6,8)]
+coords_UTM3$X - unlist(coords_UTM3$geometry)[c(1,3,5,7)]
+coords_UTM3$Y - unlist(coords_UTM3$geometry)[c(2,4,6,8)]
+
+#     NAD83 (UTM2 or coords_UTM3) appears to be the best fit
+#     I want to produce lat longs for all the squares in the grid.
+
+#   Minor grid is 3/4 mile x 3/4 mile
+
+Spacing <- 5280*3/4
+
+#   Build table of lat, long locations
+
+###     Build linear fit for (1,y), (100,y), (x,1), and (x,100)
+
+#   242E to 259E, (13,1) to (81,1) Top horizontal line
+
+M_top <- (coords[1,5]-coords[3,5])[[1]]/(coords[1,4]-coords[3,4])[[1]]
+B_top <- (coords[1,5] - M_top*coords[1,4])[[1]]
+Delta_x_top <- (coords[1,4]-coords[3,4])[[1]]/(81-13)
+Delta_y_top <- (coords[1,5]-coords[3,5])[[1]]/(81-13)
+
+#   682W to 699W, (13,71) to (81,71) Bottom horizontal line
+
+M_bot <- (coords[2,5]-coords[4,5])[[1]]/(coords[2,4]-coords[4,4])[[1]]
+B_bot <- (coords[2,5] - M_bot*coords[2,4])[[1]]
+Delta_x_bot <- (coords[2,4]-coords[4,4])[[1]]/(81-13)
+Delta_y_bot <- (coords[2,5]-coords[4,5])[[1]]/(81-13)
+
+#   242E to 682W, (13,1) to (13,71)  Left vertical line
+
+Delta_x_lft <- (coords[1,4]-coords[2,4])[[1]]/(72-1)
+Delta_y_lft <- (coords[1,5]-coords[2,5])[[1]]/(72-1)
+
+#   259E to 699W, (81,1) to (81,71)  Right vertical line
+
+Delta_x_rgt <- (coords[3,4]-coords[4,4])[[1]]/(72-1)
+Delta_y_rgt <- (coords[3,5]-coords[4,5])[[1]]/(72-1)
+
+#   Build table of grid names to X-Y
+
+Key_num <- 242
+Key_alpha <- 'E'
+
+##################################   Convert I,J into Keymap code
+IJ_2_Key <- function(I, J) {
+  #     Convert an I,J value into a Keymap code
+  
+Letters <- c("A", "B", "C", "D", "E", "F", "G", "H", "J", "K", "L", "M",
+             "N", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z") 
+  
+  Num <- case_when( 
+    J < 73 ~ floor((J-1)/6)*40 + 239,
+    J < 79 ~ floor((J-73)/6)*36 + 715,
+    J < 85 ~ floor((J-79)/6)*34 + 749,
+    TRUE   ~ floor((J-85)/6)*34 + 783
+  )
+  
+  Num <- Num + floor((I-1)/4+0.1)
+  
+  Frac <- case_when( 
+    J < 73 ~ (((J-1)/6)%%1)*6,
+    J < 79 ~ (((J-73)/6)%%1)*6,
+    J < 85 ~ (((J-79)/6)%%1)*6,
+    TRUE   ~ (((J-85)/6)%%1)*6
+  )
+  
+ #c(Num, Frac) 
+ L_val <- Letters[as.integer(((I-1)%%4+1)+Frac*4 + 0.1)]
+ c(Num, L_val)
+}
+##########################   end of IJ_2_Key
+
+##########################   Convert Key code to I,J
+Key_2_IJ <- function(Num, Alpha) {
+  Alpha_addY <- case_when(
+                Alpha %in% c("A", "B", "C", "D") ~ 1,
+                Alpha %in% c("E", "F", "G", "H") ~ 2,
+                Alpha %in% c("J", "K", "L", "M") ~ 3,
+                Alpha %in% c("N", "P", "Q", "R") ~ 4,
+                Alpha %in% c("S", "T", "U", "V") ~ 5,
+                Alpha %in% c("W", "X", "Y", "Z") ~ 6
+              )
+  Alpha_addX <- case_when(
+                Alpha %in% c("A", "E", "J", "N", "S", "W") ~ 0,
+                Alpha %in% c("B", "F", "K", "P", "T", "X") ~ 1,
+                Alpha %in% c("C", "G", "L", "Q", "U", "Y") ~ 2,
+                Alpha %in% c("D", "H", "M", "R", "V", "Z") ~ 3
+              )
+  if (Num < 715) {
+    X <- ((Num+1)%%40)*4 + 1 + Alpha_addX #  X index 
+    Y <- ((Num-((Num+1)%%40)-239)/40)*6 + Alpha_addY #  Y index 
+  } else if (Num < 749) {
+    X <- (Num-715)*4 + 1 + Alpha_addX #  X index 
+    Y <- 72 + Alpha_addY #  Y index 
+  } else if (Num > 748) {
+    X <- ((Num-749)%%34)*4 + 1 + Alpha_addX #  X index 
+    Y <- ((Num-((Num+1-749)%%34)-748)/34)*6 + 78 + Alpha_addY #  Y index 
+  }
+  
+  c(X,Y)
+}
+########################  end of Key_2_IJ
+
+# test functions
+
+for (j in 1:90) {
+  i <- 92
+  Key_Let <- IJ_2_Key(i,j)
+  IJ <- Key_2_IJ(as.integer(Key_Let[1]), Key_Let[2])
+  print(c(i, j, Key_Let, IJ))
+}
+
+#   Generate data frame of I, J, Number, Letter, X, Y
+
+#       Generate full arrays of the top and bottom X and Y coordinates
+
+X_top <- coords[1,4]$X+12*Delta_x_top - Delta_x_top*(0:96) # all good
+Y_top <- M_top*X_top + B_top # all good
+X_bot <- coords[2,4]$X+12*Delta_x_bot - Delta_x_bot*(0:96) # all good
+Y_bot <- M_bot*X_bot + B_bot # all good
+
+Translate_table <- tribble(~i, ~j, ~Num, ~Letter, ~X, ~Y)
+
+for (i in 1:97) {
+  Delta_x <- (X_top[i] - X_bot[i])/(72-2)
+  Delta_y <- (Y_top[i] - Y_bot[i])/(72-2)
+  print(paste("--->", i, Delta_x, Delta_y))
+  for (j in 1:85) {
+    Key_field <- IJ_2_Key(i, j)
+    Translate_table <- Translate_table %>% 
+      add_row(i=i, j=j, Num=Key_field[1], Letter=Key_field[2], 
+                               X=X_top[i]-(j-2)*Delta_x,
+                               Y=Y_top[i]-(j-2)*Delta_y)
+  }
+}
+
+
+Translate_table_LL <- st_as_sf(Translate_table, coords = c("X", "Y"), crs = proj4string_UTM2) 
+Translate_table_LL2 <- st_as_sf(Translate_table, coords = c("X", "Y"), crs = 26915) 
+Translate_table_LL <- st_transform(Translate_table_LL, crs = googlecrs )
+Translate_table_LL2 <- st_transform(Translate_table_LL, crs = googlecrs )
+
+setdiff(Translate_table_LL, Translate_table_LL2)
+
+#   They are the same...
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Keymaps/"
+saveRDS(Translate_table_LL, paste0(path, "Trans_Tab.rds"))
+
+```
