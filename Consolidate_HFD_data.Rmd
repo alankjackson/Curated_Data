@@ -7,7 +7,7 @@ output: html_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
-#library(sf)
+library(sf)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/HFD_Incidents/"
 
@@ -32,8 +32,21 @@ df <- filenames %>%
   purrr::map_dfr(readRDS) %>% 
   unique() # get rid of duplicates
 
+```
+
+##    Append lat long coordinates to events
+
+```{r append lat long}
+
+df <- df %>% rename(Key="Key Map")
+df_LL <- merge(Trans_tab, df) %>% 
+  select(Agency, Address, "Cross Street", "Call Time(Opened)",
+         "Incident Type", "Combined Response", Key)
+
+saveRDS(df_LL, paste0(path, "Incidents_Cumulative.rds"))
 
 ```
+
 
 
 
