@@ -205,6 +205,9 @@ for (i in 1:97) {
   }
 }
 
+Translate_table <- Translate_table %>% 
+  mutate(Key=paste0(Num, Letter)) %>% 
+  select(i, j, Key, Num, Letter, X, Y)
 
 Translate_table_LL <- st_as_sf(Translate_table, coords = c("X", "Y"), crs = proj4string_UTM2) 
 Translate_table_LL2 <- st_as_sf(Translate_table, coords = c("X", "Y"), crs = 26915) 
