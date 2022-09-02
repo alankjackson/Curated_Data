@@ -1,0 +1,126 @@
+---
+title: "Read Wunderground Data"
+author: "Alan Jackson"
+date: "2022-08-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Access Wunderground and pull down data
+
+
+```{r read}
+
+
+############   Pull and clean desired values from page
+
+Pull_clean <- function(parsed_pagesource) {
+
+  xpath <- "/html/body/app-root/app-dashboard/one-column-layout/wu-header/sidenav/mat-sidenav-container/mat-sidenav-content/div/section/section[1]/div[1]/div/section/div/div/div/lib-history/lib-history-summary/div/div[2]/table"
+  
+  css_selector <- "div.large-6:nth-child(2) > table:nth-child(1)"
+  
+  result <- xml2::read_html(parsed_pagesource) %>%
+    # select out the part of the page you want to capture
+    rvest::html_nodes(xpath=xpath)  %>% 
+    # Parse table and turn into a tibble
+    rvest::html_table(fill = TRUE)
+  
+  result <- result[[1]] # pull tibble out of list
+  names(result) <- c("Value", "High", "Low", "Avg")
+    
+  #   Now clean up values by getting rid of extraneous characters and
+  #   converting numbers to numeric
+  
+  result <- result %>% 
+    mutate(High=as.numeric(stringr::str_extract(High, "[0-9.]+"))) %>% 
+    mutate(Low =as.numeric(stringr::str_extract(Low,  "[0-9.]+"))) %>% 
+    mutate(Avg =as.numeric(stringr::str_extract(Avg,  "[0-9.]+"))) 
+    
+  return(result)
+} ############### end of function
+
+#     Read in station id's
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Weather/"
+stations <- read_delim(paste0(path,"Stations.txt"), 
+                       delim=")", 
+                       col_names=FALSE) %>% 
+  mutate(X1=stringr::str_remove(X1, "^.*\\(")) %>% 
+  mutate(Lat=stringr::str_extract(X2, "^ [0-9.]+")) %>% 
+  mutate(Lon=stringr::str_extract(X2, ", [0-9.]+")) %>% 
+  mutate(Lon=stringr::str_remove(Lon, ", "))
+
+#station <- "KTXHOUST275"
+
+days <- paste0("2022-08-", sprintf('%0.2d', "1":"31")) 
+
+#day <- "2022-08-29"
+
+#   Initialize final cumulative dataframe
+
+df <- NULL
+  
+# start the server and browser in headless mode
+ rD <- RSelenium::rsDriver(browser="firefox",
+                extraCapabilities = list("moz:firefoxOptions" = list(
+                  args = list('--headless')))
+ )
+
+driver <- rD$client
+
+#     Loop through stations and days
+
+for (i in 1:nrow(stations)) {
+#for (i in 1:2) {
+  for (day in days[19]) {
+    station <- stations$X1[i]
+    lat <- stations$Lat[i]
+    lon <- stations$Lon[i]
+
+      url <- paste0("https://www.wunderground.com/dashboard/pws/",
+                    station,
+                    "/graph/", day,
+                    "/",day,"/daily")
+      # navigate to an URL
+      print(url)
+      driver$navigate(url)
+      Sys.sleep(9)
+      
+      # get parsed page source
+      parsed_pagesource <- driver$getPageSource()[[1]]
+      
+      # Clean and pull
+      result <- Pull_clean(parsed_pagesource) 
+      
+      # Add station and date
+      
+      result <- result %>% 
+        mutate(Station=station) %>% 
+        mutate(Date=day) %>% 
+        mutate(Lat=lat) %>% 
+        mutate(Lon=lon)
+      
+      # Append to full dataframe
+      
+      df <- bind_rows(df, result)
+  
+  }
+}
+
+#close the driver
+driver$close()
+
+#close the server
+rD$server$stop()
+
+saveRDS(df, paste0(path, "All_stations_2022-08-19.rds"))
+
+```
+
+
