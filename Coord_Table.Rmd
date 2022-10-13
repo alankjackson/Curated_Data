@@ -222,3 +222,110 @@ path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Keymaps/"
 saveRDS(Translate_table_LL, paste0(path, "Trans_Tab.rds"))
 
 ```
+
+Create a new table with surrounding Poly instead of center points
+
+
+```{r polys}
+
+#   Do this in X-Y space and then convert to lat long
+
+Poly <- Translate_table
+Poly$lrx <- NA
+Poly$lry <- NA
+Poly$llx <- NA
+Poly$lly <- NA
+Poly$ulx <- NA
+Poly$uly <- NA
+Poly$urx <- NA
+Poly$ury <- NA
+Poly$Poly <- NA
+
+#   Function to convert i,j coordinates into location in array
+
+ij <- function(i,j){ (i-1)*85 + j }
+
+#   First do the edges as special cases, then infill
+
+Dx <- abs(Poly[1,]$X - Poly[ij(2,2),]$X)
+Dy <- abs(Poly[1,]$Y - Poly[ij(2,2),]$Y)
+  print(paste(Dx, ",", Dy))
+Poly[1,]$llx <- Poly[1,]$X - Dx/2
+Poly[1,]$lly <- Poly[1,]$Y - Dy/2
+Poly[1,]$lrx <- Poly[1,]$X + Dx/2
+Poly[1,]$lry <- Poly[1,]$Y - Dy/2
+Poly[1,]$urx <- Poly[1,]$X + Dx/2
+Poly[1,]$ury <- Poly[1,]$Y + Dy/2
+Poly[1,]$ulx <- Poly[1,]$X - Dx/2
+Poly[1,]$uly <- Poly[1,]$Y + Dy/2
+Poly[1,]$Poly <- list(matrix(c(Poly[1,]$lrx, Poly[1,]$lry,
+                        Poly[1,]$llx, Poly[1,]$lly,
+                        Poly[1,]$ulx, Poly[1,]$uly,
+                        Poly[1,]$urx, Poly[1,]$ury,
+                        Poly[1,]$lrx, Poly[1,]$lry),
+                        ncol=2, nrow=5, byrow=TRUE))
+
+##### st_polygon(Poly$Poly[1])
+
+foo <- tribble(~num, ~coord, ~x, ~y)
+foo <- foo %>% 
+  add_row(num=1, coord=Poly[1,]$lr, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
+  add_row(num=2, coord=Poly[1,]$ll, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
+  add_row(num=3, coord=Poly[1,]$ul, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
+  add_row(num=4, coord=Poly[1,]$ur, x=unlist(coord)[1], y=unlist(coord)[2])
+
+#   plot to check
+
+foo %>% 
+  ggplot(aes(x=x, y=y)) +
+  geom_point() +
+  geom_path() +
+  geom_text(aes(label=num), nudge_x=50) +
+  geom_point(data=Poly[1,], aes(x=X, y=Y), color="red")
+
+##outer = matrix(c(0,0,10,0,10,10,0,10,0,0),ncol=2, byrow=TRUE)
+
+for (i in 2:96){ # top row
+  Dx <- abs(Poly[i,]$X - Poly[ij(2,1+i),]$X)
+  Dy <- abs(Poly[i,]$Y - Poly[ij(2,1+i),]$Y)
+  print(paste(Dx, ",", Dy))
+  Poly[i,]$llx <- Poly[i,]$X - Dx/2
+  Poly[i,]$lly <- Poly[i,]$Y - Dy/2
+  Poly[i,]$lrx <- Poly[i,]$X + Dx/2
+  Poly[i,]$lry <- Poly[i,]$Y - Dy/2
+  Poly[i,]$urx <- Poly[i,]$X + Dx/2
+  Poly[i,]$ury <- Poly[i,]$Y + Dy/2
+  Poly[i,]$ulx <- Poly[i,]$X - Dx/2
+  Poly[i,]$uly <- Poly[i,]$Y + Dy/2
+  Poly[i,]$Poly <- list(matrix(c(Poly[i,]$lrx, Poly[i,]$lry,
+                          Poly[i,]$llx, Poly[i,]$lly,
+                          Poly[i,]$ulx, Poly[i,]$uly,
+                          Poly[i,]$urx, Poly[i,]$ury,
+                          Poly[i,]$lrx, Poly[i,]$lry),
+                          ncol=2, nrow=5, byrow=TRUE))
+  
+}
+
+Poly %>% head() %>% select(!c(Num, Letter, Poly, Key)) %>% 
+    pivot_longer(
+    #everything(),
+      cols=ends_with(c("x", "y")), 
+    names_to = c("set", ".value"),
+    names_pattern = "(.+)([x,y])",
+    values_drop_na = TRUE
+    ) %>% 
+  #pivot_longer(cols=ends_with(c("X", "Y", "x", "y")), names_to="position",
+  #             values_to="values")# %>% 
+  ggplot(aes(x=x, y=y)) +
+  geom_path()+
+  geom_text(aes(label=paste(i,j, set)), nudge_x=50) 
+
+
+```
+
+
+
+
+
+
+
