@@ -285,23 +285,27 @@ foo %>%
 
 ##outer = matrix(c(0,0,10,0,10,10,0,10,0,0),ncol=2, byrow=TRUE)
 
-for (i in 2:96){ # top row
-  Dx <- abs(Poly[i,]$X - Poly[ij(2,1+i),]$X)
-  Dy <- abs(Poly[i,]$Y - Poly[ij(2,1+i),]$Y)
+for (j in 2:84){ # left column
+  Dx <- abs(Poly[j,]$X - Poly[ij(2,j+1),]$X)
+  Dy <- abs(Poly[j,]$Y - Poly[ij(2,j+1),]$Y)
   print(paste(Dx, ",", Dy))
-  Poly[i,]$llx <- Poly[i,]$X - Dx/2
-  Poly[i,]$lly <- Poly[i,]$Y - Dy/2
-  Poly[i,]$lrx <- Poly[i,]$X + Dx/2
-  Poly[i,]$lry <- Poly[i,]$Y - Dy/2
-  Poly[i,]$urx <- Poly[i,]$X + Dx/2
-  Poly[i,]$ury <- Poly[i,]$Y + Dy/2
-  Poly[i,]$ulx <- Poly[i,]$X - Dx/2
-  Poly[i,]$uly <- Poly[i,]$Y + Dy/2
-  Poly[i,]$Poly <- list(matrix(c(Poly[i,]$lrx, Poly[i,]$lry,
-                          Poly[i,]$llx, Poly[i,]$lly,
-                          Poly[i,]$ulx, Poly[i,]$uly,
-                          Poly[i,]$urx, Poly[i,]$ury,
-                          Poly[i,]$lrx, Poly[i,]$lry),
+  Poly[j,]$llx <- Poly[j,]$X - Dx/2
+  Poly[j,]$lly <- Poly[j,]$Y - Dy/2
+  Poly[j,]$lrx <- Poly[j,]$X + Dx/2
+  Poly[j,]$lry <- Poly[j,]$Y - Dy/2
+  Poly[j,]$urx <- Poly[j-1,]$lrx
+  Poly[j,]$ury <- Poly[j-1,]$lry 
+  Poly[j,]$ulx <- Poly[j-1,]$llx 
+  Poly[j,]$uly <- Poly[j-1,]$lly 
+  #Poly[j,]$urx <- Poly[j,]$X + Dx/2
+  #Poly[j,]$ury <- Poly[j,]$Y + Dy/2
+  #Poly[j,]$ulx <- Poly[j,]$X - Dx/2
+  #Poly[j,]$uly <- Poly[j,]$Y + Dy/2
+  Poly[j,]$Poly <- list(matrix(c(Poly[j,]$lrx, Poly[j,]$lry,
+                          Poly[j,]$llx, Poly[j,]$lly,
+                          Poly[j,]$ulx, Poly[j,]$uly,
+                          Poly[j,]$urx, Poly[j,]$ury,
+                          Poly[j,]$lrx, Poly[j,]$lry),
                           ncol=2, nrow=5, byrow=TRUE))
   
 }
@@ -322,6 +326,7 @@ Poly %>% head() %>% select(!c(Num, Letter, Poly, Key)) %>%
 
 
 ```
+
 
 
 
