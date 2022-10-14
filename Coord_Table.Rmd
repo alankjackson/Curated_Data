@@ -285,32 +285,59 @@ foo %>%
 
 ##outer = matrix(c(0,0,10,0,10,10,0,10,0,0),ncol=2, byrow=TRUE)
 
-for (j in 2:84){ # left column
-  Dx <- abs(Poly[j,]$X - Poly[ij(2,j+1),]$X)
-  Dy <- abs(Poly[j,]$Y - Poly[ij(2,j+1),]$Y)
-  print(paste(Dx, ",", Dy))
-  Poly[j,]$llx <- Poly[j,]$X - Dx/2
-  Poly[j,]$lly <- Poly[j,]$Y - Dy/2
-  Poly[j,]$lrx <- Poly[j,]$X + Dx/2
-  Poly[j,]$lry <- Poly[j,]$Y - Dy/2
-  Poly[j,]$urx <- Poly[j-1,]$lrx
-  Poly[j,]$ury <- Poly[j-1,]$lry 
-  Poly[j,]$ulx <- Poly[j-1,]$llx 
-  Poly[j,]$uly <- Poly[j-1,]$lly 
-  #Poly[j,]$urx <- Poly[j,]$X + Dx/2
-  #Poly[j,]$ury <- Poly[j,]$Y + Dy/2
-  #Poly[j,]$ulx <- Poly[j,]$X - Dx/2
-  #Poly[j,]$uly <- Poly[j,]$Y + Dy/2
-  Poly[j,]$Poly <- list(matrix(c(Poly[j,]$lrx, Poly[j,]$lry,
-                          Poly[j,]$llx, Poly[j,]$lly,
-                          Poly[j,]$ulx, Poly[j,]$uly,
-                          Poly[j,]$urx, Poly[j,]$ury,
-                          Poly[j,]$lrx, Poly[j,]$lry),
-                          ncol=2, nrow=5, byrow=TRUE))
-  
+for (i in 91:97) {
+  for (j in 1:85){ # left column
+    if ((i==1) & (j==1)) {next}
+    print (paste(i, j))
+    if (j<85) { # to catch the bottom row by using the last Dx, Dy
+      Dx <- abs(Poly[ij(i,j),]$X - Poly[ij(i+1,j+1),]$X)
+      Dy <- abs(Poly[ij(i,j),]$Y - Poly[ij(i+1,j+1),]$Y)
+    }
+    if (i==97) { # to catch the rightmost column
+      if (j<85 & j>1) {
+        Dx <- abs(Poly[ij(i-1,j-1),]$X - Poly[ij(i,j),]$X)
+        Dy <- abs(Poly[ij(i-1,j-1),]$Y - Poly[ij(i,j),]$Y)
+      }
+    }
+    #print(paste(Dx, ",", Dy))
+    Poly[ij(i,j),]$llx <- Poly[ij(i,j),]$X - Dx/2
+    Poly[ij(i,j),]$lly <- Poly[ij(i,j),]$Y - Dy/2
+    Poly[ij(i,j),]$lrx <- Poly[ij(i,j),]$X + Dx/2
+    Poly[ij(i,j),]$lry <- Poly[ij(i,j),]$Y - Dy/2
+    if (j>1){
+      Poly[ij(i,j),]$ulx <- Poly[ij(i,j-1),]$llx 
+      Poly[ij(i,j),]$uly <- Poly[ij(i,j-1),]$lly 
+    }
+    else { # top row
+      Poly[ij(i,j),]$ulx <- Poly[ij(i-1,j),]$urx 
+      Poly[ij(i,j),]$uly <- Poly[ij(i-1,j),]$ury 
+    }
+    if (i>1 & j>1) {
+      Poly[ij(i,j),]$urx <- Poly[ij(i,j-1),]$lrx
+      Poly[ij(i,j),]$ury <- Poly[ij(i,j-1),]$lry 
+    }
+    else { # top row
+      Poly[ij(i,j),]$urx <- Poly[ij(i,j),]$X + Dx/2
+      Poly[ij(i,j),]$ury <- Poly[ij(i,j),]$Y + Dy/2
+    }
+    #Poly[ij(i,j),]$urx <- Poly[ij(i,j),]$X + Dx/2
+    #Poly[ij(i,j),]$ury <- Poly[ij(i,j),]$Y + Dy/2
+    #Poly[ij(i,j),]$ulx <- Poly[ij(i,j),]$X - Dx/2
+    #Poly[ij(i,j),]$uly <- Poly[ij(i,j),]$Y + Dy/2
+    Poly[ij(i,j),]$Poly <- list(matrix(c(Poly[ij(i,j),]$lrx, Poly[ij(i,j),]$lry,
+                            Poly[ij(i,j),]$llx, Poly[ij(i,j),]$lly,
+                            Poly[ij(i,j),]$ulx, Poly[ij(i,j),]$uly,
+                            Poly[ij(i,j),]$urx, Poly[ij(i,j),]$ury,
+                            Poly[ij(i,j),]$lrx, Poly[ij(i,j),]$lry),
+                            ncol=2, nrow=5, byrow=TRUE))
+    
+  }
 }
 
-Poly %>% head() %>% select(!c(Num, Letter, Poly, Key)) %>% 
+Poly %>% 
+  #head(860) %>% 
+  tail(200) %>% 
+  select(!c(Num, Letter, Poly, Key)) %>% 
     pivot_longer(
     #everything(),
       cols=ends_with(c("x", "y")), 
@@ -320,9 +347,11 @@ Poly %>% head() %>% select(!c(Num, Letter, Poly, Key)) %>%
     ) %>% 
   #pivot_longer(cols=ends_with(c("X", "Y", "x", "y")), names_to="position",
   #             values_to="values")# %>% 
+  #ggplot(aes(x=x, y=y, color=j)) +
   ggplot(aes(x=x, y=y)) +
-  geom_path()+
-  geom_text(aes(label=paste(i,j, set)), nudge_x=50) 
+  geom_path()
+  #geom_point(aes(size=j), shape="o")+
+  #geom_text(aes(label=paste(i,j, set)), nudge_x=50) 
 
 
 ```
