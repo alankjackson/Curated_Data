@@ -12,6 +12,7 @@ Note that this information is provided for educational purposes only.
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(sf)
+library(leaflet)
 
 googlecrs <- 4326
 
@@ -258,12 +259,22 @@ Poly[1,]$urx <- Poly[1,]$X + Dx/2
 Poly[1,]$ury <- Poly[1,]$Y + Dy/2
 Poly[1,]$ulx <- Poly[1,]$X - Dx/2
 Poly[1,]$uly <- Poly[1,]$Y + Dy/2
-Poly[1,]$Poly <- list(matrix(c(Poly[1,]$lrx, Poly[1,]$lry,
-                        Poly[1,]$llx, Poly[1,]$lly,
-                        Poly[1,]$ulx, Poly[1,]$uly,
-                        Poly[1,]$urx, Poly[1,]$ury,
-                        Poly[1,]$lrx, Poly[1,]$lry),
-                        ncol=2, nrow=5, byrow=TRUE))
+
+foo <- list(matrix(c(Poly[1,]$lrx, Poly[1,]$lry,
+       Poly[1,]$llx, Poly[1,]$lly,
+       Poly[1,]$ulx, Poly[1,]$uly,
+       Poly[1,]$urx, Poly[1,]$ury,
+       Poly[1,]$lrx, Poly[1,]$lry),
+       ncol=2, nrow=5, byrow=TRUE))
+Poly$Poly[1] <- st_sfc(st_polygon(foo), crs=proj4string_UTM2)
+# lnd_point = st_point(c(0.1, 51.5))                 # sfg object
+# lnd_geom = st_sfc(lnd_point, crs = 4326)           # sfc object
+# lnd_attrib = data.frame(                           # data.frame object
+#   name = "London",
+#   temperature = 25,
+#   date = as.Date("2017-06-21")
+#   )
+# lnd_sf = st_sf(lnd_attrib, geometry = lnd_geom)    # sf object
 
 ##### st_polygon(Poly$Poly[1])
 
@@ -285,58 +296,74 @@ foo %>%
 
 ##outer = matrix(c(0,0,10,0,10,10,0,10,0,0),ncol=2, byrow=TRUE)
 
-for (i in 91:97) {
+for (i in 1:97) {
   for (j in 1:85){ # left column
     if ((i==1) & (j==1)) {next}
-    print (paste(i, j))
-    if (j<85) { # to catch the bottom row by using the last Dx, Dy
+    ###   Calculate Dx and Dy
+    if (i<97 & j<85) { # Normal calculation
       Dx <- abs(Poly[ij(i,j),]$X - Poly[ij(i+1,j+1),]$X)
       Dy <- abs(Poly[ij(i,j),]$Y - Poly[ij(i+1,j+1),]$Y)
     }
-    if (i==97) { # to catch the rightmost column
-      if (j<85 & j>1) {
-        Dx <- abs(Poly[ij(i-1,j-1),]$X - Poly[ij(i,j),]$X)
-        Dy <- abs(Poly[ij(i-1,j-1),]$Y - Poly[ij(i,j),]$Y)
-      }
+    if (i==97 & j<85) { # to catch the rightmost column
+      Dx <- abs(Poly[ij(i-1,j),]$X - Poly[ij(i,j+1),]$X)
+      Dy <- abs(Poly[ij(i-1,j),]$Y - Poly[ij(i,j+1),]$Y)
+    }
+    if (i==97 & j==85) { # to catch the bottom corner
+      Dx <- abs(Poly[ij(i-1,j-1),]$X - Poly[ij(i,j),]$X)
+      Dy <- abs(Poly[ij(i-1,j-1),]$Y - Poly[ij(i,j),]$Y)
     }
     #print(paste(Dx, ",", Dy))
-    Poly[ij(i,j),]$llx <- Poly[ij(i,j),]$X - Dx/2
-    Poly[ij(i,j),]$lly <- Poly[ij(i,j),]$Y - Dy/2
-    Poly[ij(i,j),]$lrx <- Poly[ij(i,j),]$X + Dx/2
-    Poly[ij(i,j),]$lry <- Poly[ij(i,j),]$Y - Dy/2
-    if (j>1){
+    
+    ###   Calculate corners
+    if (i==1){ # left column
+        #print (paste("A", i, j))
+      Poly[ij(i,j),]$lrx <- Poly[ij(i,j),]$X + Dx/2
+      Poly[ij(i,j),]$lry <- Poly[ij(i,j),]$Y - Dy/2
       Poly[ij(i,j),]$ulx <- Poly[ij(i,j-1),]$llx 
       Poly[ij(i,j),]$uly <- Poly[ij(i,j-1),]$lly 
-    }
-    else { # top row
-      Poly[ij(i,j),]$ulx <- Poly[ij(i-1,j),]$urx 
-      Poly[ij(i,j),]$uly <- Poly[ij(i-1,j),]$ury 
-    }
-    if (i>1 & j>1) {
+      Poly[ij(i,j),]$llx <- Poly[ij(i,j),]$X - Dx/2
+      Poly[ij(i,j),]$lly <- Poly[ij(i,j),]$Y - Dy/2
       Poly[ij(i,j),]$urx <- Poly[ij(i,j-1),]$lrx
       Poly[ij(i,j),]$ury <- Poly[ij(i,j-1),]$lry 
     }
-    else { # top row
+    else if (j==1) { # top row
+        #print (paste("B", i, j))
+      Poly[ij(i,j),]$lrx <- Poly[ij(i,j),]$X + Dx/2
+      Poly[ij(i,j),]$lry <- Poly[ij(i,j),]$Y - Dy/2
+      Poly[ij(i,j),]$ulx <- Poly[ij(i-1,j),]$urx 
+      Poly[ij(i,j),]$uly <- Poly[ij(i-1,j),]$ury 
+      Poly[ij(i,j),]$llx <- Poly[ij(i-1,j),]$lrx 
+      Poly[ij(i,j),]$lly <- Poly[ij(i-1,j),]$lry 
       Poly[ij(i,j),]$urx <- Poly[ij(i,j),]$X + Dx/2
       Poly[ij(i,j),]$ury <- Poly[ij(i,j),]$Y + Dy/2
     }
-    #Poly[ij(i,j),]$urx <- Poly[ij(i,j),]$X + Dx/2
-    #Poly[ij(i,j),]$ury <- Poly[ij(i,j),]$Y + Dy/2
-    #Poly[ij(i,j),]$ulx <- Poly[ij(i,j),]$X - Dx/2
-    #Poly[ij(i,j),]$uly <- Poly[ij(i,j),]$Y + Dy/2
-    Poly[ij(i,j),]$Poly <- list(matrix(c(Poly[ij(i,j),]$lrx, Poly[ij(i,j),]$lry,
-                            Poly[ij(i,j),]$llx, Poly[ij(i,j),]$lly,
-                            Poly[ij(i,j),]$ulx, Poly[ij(i,j),]$uly,
-                            Poly[ij(i,j),]$urx, Poly[ij(i,j),]$ury,
-                            Poly[ij(i,j),]$lrx, Poly[ij(i,j),]$lry),
-                            ncol=2, nrow=5, byrow=TRUE))
+    else { # Normal interior calculation
+        #print (paste("C", i, j))
+      Poly[ij(i,j),]$lrx <- Poly[ij(i,j),]$X + Dx/2
+      Poly[ij(i,j),]$lry <- Poly[ij(i,j),]$Y - Dy/2
+      Poly[ij(i,j),]$ulx <- Poly[ij(i,j-1),]$llx 
+      Poly[ij(i,j),]$uly <- Poly[ij(i,j-1),]$lly 
+      Poly[ij(i,j),]$llx <- Poly[ij(i-1,j),]$lrx 
+      Poly[ij(i,j),]$lly <- Poly[ij(i-1,j),]$lry 
+      Poly[ij(i,j),]$urx <- Poly[ij(i,j-1),]$lrx
+      Poly[ij(i,j),]$ury <- Poly[ij(i,j-1),]$lry 
+    }
+
+    foo <- list(matrix(c(
+       Poly[ij(i,j),]$lrx, Poly[ij(i,j),]$lry,
+       Poly[ij(i,j),]$llx, Poly[ij(i,j),]$lly,
+       Poly[ij(i,j),]$ulx, Poly[ij(i,j),]$uly,
+       Poly[ij(i,j),]$urx, Poly[ij(i,j),]$ury,
+       Poly[ij(i,j),]$lrx, Poly[ij(i,j),]$lry),
+       ncol=2, nrow=5, byrow=TRUE))
+    Poly$Poly[ij(i,j)] <- st_sfc(st_polygon(foo), crs=proj4string_UTM2)
     
   }
 }
 
 Poly %>% 
-  #head(860) %>% 
-  tail(200) %>% 
+  head(200) %>% 
+  #tail(200) %>% 
   select(!c(Num, Letter, Poly, Key)) %>% 
     pivot_longer(
     #everything(),
@@ -353,9 +380,30 @@ Poly %>%
   #geom_point(aes(size=j), shape="o")+
   #geom_text(aes(label=paste(i,j, set)), nudge_x=50) 
 
+#     Make an sf object
+
+Translate_poly <- Poly %>% 
+  select(i,j,Key,X,Y,Poly) 
+
+Translate_poly <- st_sf(Translate_poly, geometry=Poly$Poly)
+sf::st_crs(Translate_poly) <- proj4string_UTM2
+
 
 ```
 
+Plot interactively
+
+```{r interactive plot}
+
+leaflet::leaflet() %>% 
+  leaflet::addTiles() %>% # OpenStreetMap by default
+  leaflet::addPolygons(data=st_transform(Translate_poly, crs=googlecrs), 
+                   color="black",
+                   opacity=1,
+                   weight=0.5,
+                   fillOpacity = 0.01)
+
+```
 
 
 
