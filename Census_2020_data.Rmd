@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r view}
 
-Looky <- load_variables(2020, c("pl"), cache=TRUE)
+Looky1 <- load_variables(2020, c("pl"), cache=TRUE)
 Looky <- load_variables(2020, c("acs5"), cache=TRUE)
 
 #     All these by block
@@ -45,9 +45,22 @@ acs_vars_t <- c(Born_US="B05002_002", # Born in the US, tract
               Not_US_citizen="B05002_021"  # Not a US citizen, tract
               )
 
+age_labels <- c("Total",  "TotM", "M0to5", "M_5to9", "M_10to14", "M_15to17",
+ "M_18and19", "M_20", "M_21", "M_22to24", "M_25to29", "M_30to34", "M_35to39",
+ "M_40to44", "M_45to49", "M_50to54", "M_55to59", "M_60and61", "M_62to64",
+ "M_65and66", "M_67to69", "M_70to74", "M_75to79", "M_80to84", "M_85",
+ "TotF", "F0to5", "F_5to9", "F_10to14", "F_15to17", "F_18and19", "F_20", "F_21",
+ "F_22to24", "F_25to29", "F_30to34", "F_35to39", "F_40to44", "F_45to49",
+ "F_50to54", "F_55to59", "F_60and61", "F_62to64", "F_65and66", "F_67to69",
+ "F_70to74", "F_75to79", "F_80to84", "F_85" )
+
+acs_age <- c(paste0("B01001_", sprintf("%03d", 1:49)))
+
+names(acs_age) <- age_labels
+
 ```
 
-
+##    Get the data and save
 
 ```{r get data}
 
@@ -75,15 +88,54 @@ ACS_t <- get_acs(geography="tract",
                output="wide",
                geometry=TRUE) 
 
+ACS_age <- get_acs(geography="block group",
+               variables=acs_age,
+               year=2020,
+               state="TX",
+               county="201",
+               output="wide",
+               geometry=TRUE) 
+
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Census_data/"
 
 saveRDS(Pop, paste0(path, "Pop_data_by_block_2020.rds"))
 saveRDS(ACS_b, paste0(path, "Income_and_Age_by_BlkGrp_2015_2020.rds"))
 saveRDS(ACS_t, paste0(path, "Birthplace_citizenship_by_tract_2015-2020.rds"))
+saveRDS(ACS_age, paste0(path, "Age_DistributionBySex_by_BlkGrp_2015-2020.rds"))
 
+```
+
+##    Read in HUD crosswalk file and save
+
+https://www.huduser.gov/portal/datasets/usps_crosswalk.html#codebook
+
+```{r HUD crosswalk file}
+
+```
+
+
+
+##  push data into zipcodes and save
+
+```{r zipcodes}
+
+#   Read in 2020 ZCTA polygons
+
+#   For tract data I can use the HUD crosswalk file from
+#   https://www.huduser.gov/portal/datasets/usps_crosswalk.html#data
 
 
 
 ```
+
+
+
+
+
+
+
+
+
+
 
