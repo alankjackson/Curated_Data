@@ -278,21 +278,21 @@ Poly$Poly[1] <- st_sfc(st_polygon(foo), crs=proj4string_UTM2)
 
 ##### st_polygon(Poly$Poly[1])
 
-foo <- tribble(~num, ~coord, ~x, ~y)
-foo <- foo %>% 
-  add_row(num=1, coord=Poly[1,]$lr, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
-  add_row(num=2, coord=Poly[1,]$ll, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
-  add_row(num=3, coord=Poly[1,]$ul, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
-  add_row(num=4, coord=Poly[1,]$ur, x=unlist(coord)[1], y=unlist(coord)[2])
-
-#   plot to check
-
-foo %>% 
-  ggplot(aes(x=x, y=y)) +
-  geom_point() +
-  geom_path() +
-  geom_text(aes(label=num), nudge_x=50) +
-  geom_point(data=Poly[1,], aes(x=X, y=Y), color="red")
+# foo <- tribble(~num, ~coord, ~x, ~y)
+# foo <- foo %>% 
+#   add_row(num=1, coord=Poly[1,]$lr, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
+#   add_row(num=2, coord=Poly[1,]$ll, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
+#   add_row(num=3, coord=Poly[1,]$ul, x=unlist(coord)[1], y=unlist(coord)[2]) %>% 
+#   add_row(num=4, coord=Poly[1,]$ur, x=unlist(coord)[1], y=unlist(coord)[2])
+# 
+# #   plot to check
+# 
+# foo %>% 
+#   ggplot(aes(x=x, y=y)) +
+#   geom_point() +
+#   geom_path() +
+#   geom_text(aes(label=num), nudge_x=50) +
+#   geom_point(data=Poly[1,], aes(x=X, y=Y), color="red")
 
 ##outer = matrix(c(0,0,10,0,10,10,0,10,0,0),ncol=2, byrow=TRUE)
 
@@ -388,6 +388,10 @@ Translate_poly <- Poly %>%
 Translate_poly <- st_sf(Translate_poly, geometry=Poly$Poly)
 sf::st_crs(Translate_poly) <- proj4string_UTM2
 
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Keymaps/"
+saveRDS(Translate_poly, paste0(path, "Trans_Tab_Poly_xy.rds"))
+saveRDS(st_transform(Translate_poly, crs=googlecrs), 
+        paste0(path, "Trans_Tab_Poly_ll.rds"))
 
 ```
 
@@ -401,6 +405,7 @@ leaflet::leaflet() %>%
                    color="black",
                    opacity=1,
                    weight=0.5,
+                   popup = ~Key,
                    fillOpacity = 0.01)
 
 ```
