@@ -31,6 +31,8 @@ dec_vars <- c(Pop="P1_001N", # total population
               Pop_not_hisp="P2_005N"  # White not Hispanic
               )
 
+#####   ACS data is 5 year data from 2015-2020
+
 #   All these by block group
 acs_vars_b <- c(Med_inc="B19013_001", # median household income, blk grp
               Per_cap_inc="B19301_001", # Per capita income, blk grp
