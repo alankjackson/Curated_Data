@@ -242,6 +242,22 @@ https://www.epa.gov/outdoor-air-quality-data/download-daily-data
 Pending....
 
 -------------------------------
+ZCTA polygons
+
+These are available from many sources. I have used 2, the census bureau and
+the city of Houston.
+
+The census bureau is nice and well-documented, but you have to download the 
+entire 1/2 Gb file, which is painful. But you get to pick which year file
+you get.
+
+https://www.census.gov/cgi-bin/geo/shapefiles/index.php
+
+https://cohgis-mycity.opendata.arcgis.com/datasets/coh-zipcode/explore?location=29.761150%2C-95.394800%2C9.16
+
+I have the 2020 zcta from census, and an earlier rendition from CoH.
+
+-------------------------------
 
 
 
