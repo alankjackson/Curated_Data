@@ -1,0 +1,87 @@
+---
+title: "Census Data 2020"
+author: "Alan Jackson"
+date: "2022-10-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidycensus)
+
+census_api_key("c458095036ca1037f97b9c7019b6a7ac2dbf90d4")
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##        What do I want to download?
+
+```{r view}
+
+Looky <- load_variables(2020, c("pl"), cache=TRUE)
+Looky <- load_variables(2020, c("acs5"), cache=TRUE)
+
+#     All these by block
+
+dec_vars <- c(Pop="P1_001N", # total population
+              Pop_white="P1_003N", # white
+              Pop_black="P1_004N", # black
+              Pop_asian="P1_006N", # Asian
+              Pop_hispanic="P2_002N", # Hispanic
+              Pop_not_hisp="P2_005N"  # White not Hispanic
+              )
+
+#   All these by block group
+acs_vars_b <- c(Med_inc="B19013_001", # median household income, blk grp
+              Per_cap_inc="B19301_001", # Per capita income, blk grp
+              Aggreg_inc="B19025_001", # Aggregate household income, blk grp
+              Med_age="B01002_001") # median age, blk grp
+
+#   All these by tract
+acs_vars_t <- c(Born_US="B05002_002", # Born in the US, tract
+              Born_foreign="B05002_013", # Foreign born, tract
+              Not_US_citizen="B05002_021"  # Not a US citizen, tract
+              )
+
+```
+
+
+
+```{r get data}
+
+Pop <- get_decennial(geography="block",
+                     variables=dec_vars,
+                     year=2020,
+                     state="TX",
+                     county="201",
+                     output="wide",
+                     geometry=TRUE)
+
+ACS_b <- get_acs(geography="block group",
+               variables=acs_vars_b,
+               year=2020,
+               state="TX",
+               county="201",
+               output="wide",
+               geometry=TRUE) 
+
+ACS_t <- get_acs(geography="tract",
+               variables=acs_vars_t,
+               year=2020,
+               state="TX",
+               county="201",
+               output="wide",
+               geometry=TRUE) 
+
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Census_data/"
+
+saveRDS(Pop, paste0(path, "Pop_data_by_block_2020.rds"))
+saveRDS(ACS_b, paste0(path, "Income_and_Age_by_BlkGrp_2015_2020.rds"))
+saveRDS(ACS_t, paste0(path, "Birthplace_citizenship_by_tract_2015-2020.rds"))
+
+
+
+
+```
+
