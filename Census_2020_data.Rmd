@@ -67,7 +67,12 @@ names(acs_age) <- age_labels
 
 ##    Get the data and save
 
+E ending means "Estimate", M ending means MOE or Margin of Error = 90%
+confidence bound.
+
 ```{r get data}
+
+#   error represents the 90% confidence level (Margin Of Error and Estimate)
 
 Pop <- get_decennial(geography="block",
                      variables=dec_vars,
@@ -130,7 +135,7 @@ saveRDS(Tract_Tx_Xwalk, paste0(path, "HUD_Crosswalk_Tx_file_2010.rds"))
 
 ```
 
-## Calculate crosswalk files for Tracts to zipcodes
+## Calculate crosswalk files for BlkGrps and Tracts to zipcodes
 
 I'll do this by first creating a crosswalk table for the blocks based on
 overlap area, and using that ratio to weight by population.
@@ -144,12 +149,8 @@ Zips <- readRDS(paste0(folder, "ZCTA_polygons_2020_HoustonArea.rds")) %>%
 
 #   Calculate %area of each block in zipcodes
 
-Test_tracts <- Tract_Tx_Xwalk %>% 
-  filter(ZIP=="77008" | ZIP=="77009" | ZIP=="77007")
-
 Test_Pop <- Pop %>% 
-  select(GEOID, Pop) %>% 
-  #filter(stringr::str_sub(GEOID, end=11) %in% Test_tracts$TRACT) %>% 
+  select(GEOID, starts_with("Pop")) %>% 
   sf::st_transform(crs=local_crs)
 
 Test_out <- sf::st_intersection(Test_Pop, Zips) %>% 
@@ -216,6 +217,8 @@ leaflet::leaflet() %>%
                    popup = ~GEOID,
                    fillOpacity = 0.01)
 
+saveRDS(Blkgrp_Zip_crosswalk, paste0(path, "Crosswalk_BlkGrp_to_ZCTA_2020.rds"))
+saveRDS(Tract_Zip_crosswalk, paste0(path, "Crosswalk_Tract_to_ZCTA_2020.rds"))
 
 ```
 
@@ -225,21 +228,65 @@ leaflet::leaflet() %>%
 
 ```{r zipcodes}
 
-#   Read in 2020 ZCTA polygons
+#   First data from block groups - but only those that make sense (no medians)
 
-#   For tract data I can use the HUD crosswalk file from
-#   https://www.huduser.gov/portal/datasets/usps_crosswalk.html#data
+dosum <- function(a){sum(a, na.rm = TRUE)}
 
-ZCTA_Nationality <-  left_join(Tract_Tx_Xwalk, ACS_t, by=c("TRACT"="GEOID"))
+By_Race <- Test_out %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(ZCTA, starts_with("Pop")) %>% 
+  group_by(ZCTA) %>% 
+    summarize_at(.vars = vars(Pop:Pop_not_hisp),
+                 .funs = dosum)
+  
+
+Temp_income <- ACS_b %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, starts_with("Pop_"), starts_with("Agg")) %>% 
+  left_join(., Blkgrp_Zip_crosswalk, by=c("GEOID"="Blk_grp")) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(Pop_blk_grpE:Aggreg_incM), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(ZCTA) %>% 
+    summarize_at(.vars = vars(Pop_blk_grpE:Aggreg_incM),
+                 .funs = dosum)
+
+Temp_ages <- ACS_age %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, TotalE:F_85E) %>% 
+  left_join(., Blkgrp_Zip_crosswalk, by=c("GEOID"="Blk_grp")) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(TotalE:F_85E), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(ZCTA) %>% 
+    summarize_at(.vars = vars(TotalE:F_85E),
+                 .funs = dosum)
+
+#   Now the tract data
+
+Temp_tract <- ACS_t %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, Pop_tractE:Not_US_citizenM) %>% 
+  left_join(., Tract_Zip_crosswalk, by=c("GEOID"="Tract")) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(Pop_tractE:Not_US_citizenM), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(ZCTA) %>% 
+    summarize_at(.vars = vars(Pop_tractE:Not_US_citizenM),
+                 .funs = dosum)
+
+#   Now combine all into one file and save
+
+Census_by_ZCTA <- By_Race %>% 
+  left_join(., Temp_income, by="ZCTA") %>% 
+  left_join(., Temp_ages, by="ZCTA") %>%
+  left_join(., Temp_tract, by="ZCTA") 
 
 
-
-a <- tribble(~a, ~b, 1,2,1,3,2,4)
-b <- tribble(~a, ~c, 1,5,2,7)
-
-left_join(a,b, by="a")
-
-left_join(b,a, by="a")
+saveRDS(Census_by_ZCTA, paste0(path, "Census_data_by_ZCTA_2020.rds"))
 
 ```
 
