@@ -258,8 +258,16 @@ https://cohgis-mycity.opendata.arcgis.com/datasets/coh-zipcode/explore?location=
 I have the 2020 zcta from census, and an earlier rendition from CoH.
 
 -------------------------------
+Various census data attached to various polygons
 
+From the census downloaded Pop, Pop by Race, Aggregate income,
+Age distribution numbers by sex, and where born & citizenship
 
+These are attached to natively Block, Block-groups, or Tracts as the 
+case may be.
+
+These are attached to ZCTA areas in Harris county in 
+Census_data_by_ZCTA_2020.rds
 
 
 
