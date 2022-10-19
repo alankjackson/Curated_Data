@@ -378,15 +378,92 @@ Tract_Keymap_crosswalk <- Test_out %>%
 #     Save files
 
 saveRDS(Blk_Keymap_crosswalk, 
-        paste0(path, "Crosswalk_Blk_to_Keyfile_2020.rds"))
+        paste0(path, "Crosswalk_Blk_to_Keymap_2020.rds"))
 saveRDS(Blkgrp_Keymap_crosswalk, 
-        paste0(path, "Crosswalk_BlkGrp_to_Keyfile_2020.rds"))
+        paste0(path, "Crosswalk_BlkGrp_to_Keymap_2020.rds"))
 saveRDS(Tract_Keymap_crosswalk, 
-        paste0(path, "Crosswalk_Tract_to_Keyfile_2020.rds"))
+        paste0(path, "Crosswalk_Tract_to_Keymap_2020.rds"))
 
 ```
 
+##  push data into Keymaps and save
 
+```{r keymaps}
+
+#   First data from block groups - but only those that make sense (no medians)
+
+dosum <- function(a){round(sum(a, na.rm = TRUE))}
+
+# By_Race <- Test_out %>% 
+#   sf::st_drop_geometry() %>% # don't need this and it slows things down
+#   select(Key, starts_with("Pop")) %>% 
+#   group_by(Key) %>% 
+#     summarize_at(.vars = vars(Pop:Pop_not_hisp),
+#                  .funs = dosum)
+  
+
+By_Race <- Pop %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, starts_with("Pop")) %>% 
+  left_join(., Blk_Keymap_crosswalk, by="GEOID") %>% 
+  rename(Pop=Pop.x) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(Pop:Pop_not_hisp), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(Key) %>% 
+    summarize_at(.vars = vars(Pop:Pop_not_hisp),
+                 .funs = dosum)  
+
+Temp_income <- ACS_b %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, starts_with("Pop_"), starts_with("Agg")) %>% 
+  left_join(., Blkgrp_Keymap_crosswalk, by=c("GEOID"="Blk_grp")) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(Pop_blk_grpE:Aggreg_incM), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(Key) %>% 
+    summarize_at(.vars = vars(Pop_blk_grpE:Aggreg_incM),
+                 .funs = dosum)
+
+Temp_ages <- ACS_age %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, TotalE:F_85E) %>% 
+  left_join(., Blkgrp_Keymap_crosswalk, by=c("GEOID"="Blk_grp")) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(TotalE:F_85E), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(Key) %>% 
+    summarize_at(.vars = vars(TotalE:F_85E),
+                 .funs = dosum)
+
+#   Now the tract data
+
+Temp_tract <- ACS_t %>% 
+  sf::st_drop_geometry() %>% # don't need this and it slows things down
+  select(GEOID, NAME, Pop_tractE:Not_US_citizenM) %>% 
+  left_join(., Tract_Keymap_crosswalk, by=c("GEOID"="Tract")) %>% 
+  filter(ratio>0) %>% 
+  #   Scale portions by ratio
+  mutate_at(.vars = vars(Pop_tractE:Not_US_citizenM), 
+            .funs = list(~ ratio * .)) %>% 
+  group_by(Key) %>% 
+    summarize_at(.vars = vars(Pop_tractE:Not_US_citizenM),
+                 .funs = dosum)
+
+#   Now combine all into one file and save
+
+Census_by_Keymap <- By_Race %>% 
+  left_join(., Temp_income, by="Key") %>% 
+  left_join(., Temp_ages, by="Key") %>%
+  left_join(., Temp_tract, by="Key") 
+
+
+saveRDS(Census_by_Keymap, paste0(path, "Census_data_by_Keymap_2020.rds"))
+
+```
 
 
 
