@@ -1,0 +1,39 @@
+---
+title: "Read HGAC County boundaries"
+author: "Alan Jackson"
+date: "2022-11-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(leaflet)
+
+googlecrs <- 4326
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/City_and_County_bdys/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r read and write}
+
+fgdb <- paste0(path, "HGAC_Counties_Political.dbf")
+
+# Read the feature class
+temp <- sf::st_read(fgdb)
+sf::st_crs(temp) <- googlecrs
+
+summary(temp)
+
+leaflet(temp) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons()
+
+
+saveRDS(temp, paste0(path, "HGAC_County_bdys.Rds"))
+
+```
+
