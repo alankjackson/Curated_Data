@@ -209,6 +209,8 @@ https://www.kinderudp.org/#/datasetCatalog/3xmql87o2y1v
 
 Downloaded May 8, 2022
 
+in Neighborhoods/City_polys.rds
+
 -------------------------------
 Voting precincts in Harris County
 
@@ -268,6 +270,14 @@ case may be.
 
 These are attached to ZCTA areas in Harris county in 
 Census_data_by_ZCTA_2020.rds
+
+-------------------------------
+County boundaries
+
+downloaded 11/4/2022
+https://gishub-h-gac.hub.arcgis.com/datasets/H-GAC::hgac-counties-political
+
+City_and_County_bdys/HGAC_County_bdys.rds
 
 
 
