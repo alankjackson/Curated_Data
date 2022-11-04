@@ -35,5 +35,22 @@ leaflet(temp) %>%
 
 saveRDS(temp, paste0(path, "HGAC_County_bdys.Rds"))
 
+
+fgdb <- paste0(path, "HGAC_City_Boundaries.dbf")
+
+# Read the feature class
+temp <- sf::st_read(fgdb)
+sf::st_crs(temp) <- googlecrs
+
+summary(temp)
+
+leaflet(temp) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons()
+
+
+saveRDS(temp, paste0(path, "HGAC_City_bdys.Rds"))
+
 ```
 
