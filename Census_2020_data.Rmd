@@ -28,7 +28,9 @@ Looky <- load_variables(2020, c("acs5"), cache=TRUE)
 
 #     All these by block
 
-dec_vars <- c(Pop="P1_001N", # total population
+dec_vars <- c(Households="H1_001N", # total households
+              Households_occ="H1_002N", # total households occupied
+              Pop="P1_001N", # total population
               Pop_white="P1_003N", # white
               Pop_black="P1_004N", # black
               Pop_asian="P1_006N", # Asian
