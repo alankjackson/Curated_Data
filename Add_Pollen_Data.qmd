@@ -1,0 +1,24 @@
+---
+title: "Add New Pollen"
+format: html
+editor: visual
+---
+
+## Add new pollen data
+
+```{r initialize}
+#| echo: false
+
+library(tidyverse)
+library(lubridate)
+library(readxl) # read excel files
+
+savepath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/PollenAndMold/"
+path <- "https://www.houstontx.gov/health/Pollen-Mold/Pollen_Archives/"
+
+df <- readRDS(paste0(savepath, "MasterPollenData.rds"))
+
+start_year <- "2021"
+start_month <- "10"
+
+```

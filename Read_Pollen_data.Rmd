@@ -53,7 +53,8 @@ for (yr in as.character(2013:2021)) {
 
 #   Read in files using numeric months
 
-for (yr in as.character(2013:2022)) {
+# for (yr in as.character(2013:2022)) {
+for (yr in as.character(2022:2023)) {
   for (mon in sprintf("%02d", 1:12)) {
     url <- paste0(yr, mon, "-pollen-count.xls")
     #if (grepl("201902", url)) {url <- paste0(url, "x")}
