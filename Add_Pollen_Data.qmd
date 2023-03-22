@@ -20,6 +20,7 @@ df_old <-  readRDS(paste0(savepath, "MasterPollenData.rds"))
 
 start_year <- "2021"
 start_month <- 10
+#   end 2/2023
 
 ```
 
