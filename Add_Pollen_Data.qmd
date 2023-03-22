@@ -264,7 +264,10 @@ df_old <-
     ungroup() %>% 
   select(-`Hickory/Pecan`)
   
+#   Remove totals
 
+df_old <- df_old %>% 
+  select(-contains("Total"))
 
 ```
 
