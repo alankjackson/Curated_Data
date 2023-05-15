@@ -18,13 +18,13 @@ path <- "https://www.houstontx.gov/health/Pollen-Mold/Pollen_Archives/"
 
 df_old <-  readRDS(paste0(savepath, "MasterPollenData.rds"))
 
-start_year <- "2021"
-start_month <- 10
+start_year <- "2023"
+start_month <- 3
 #   end 2/2023
 
 ```
 
-##    Read in individual months to be cleaned and added
+## Read in individual months to be cleaned and added
 
 ```{r read in files}
 
@@ -71,7 +71,7 @@ for (url in url_list$url){
 
 ```
 
-##        Functions
+## Functions
 
 ```{r functions}
 
@@ -186,8 +186,7 @@ recode_vec <- setNames(translate$from, translate$to)
 
 ```
 
-
-##      Cleanup data
+## Cleanup data
 
 ```{r cleanup}
 
@@ -197,9 +196,13 @@ keep <- url_list
 # Create an output filename column in url_list
 url_list$filename <- NA
 for (i in 1:nrow(url_list)) {
+  print(paste("-1-", i))
   url <-  unlist(url_list[i,1])
-  y <- str_sub(url,1,4) # get year
-  m <- str_sub(url,5,6) # get month
+  print(paste("-2-", url))
+  y <- stringr::str_sub(url,1,4) # get year
+  print(paste("-3-", y))
+  m <- stringr::str_sub(url,5,6) # get month
+  print(paste("-4-", m))
   url_list[i,]$filename <- paste0(tolower(month.name)[as.numeric(m)],
                                       "_",
                                       y)
@@ -254,7 +257,7 @@ oak %>%
 
 ```
 
-##        Temporary clean up old data file
+## Temporary clean up old data file
 
 ```{r old cleanup}
 
@@ -262,7 +265,9 @@ df_old <-
   df_old %>% 
   rowwise() %>% 
   mutate(Hickory=sum(Hickory, `Hickory/Pecan`, na.rm=TRUE)) %>% 
+  mutate(Alnus=sum(Alnus, `Alnus(Alder)`, na.rm=TRUE)) %>% 
     ungroup() %>% 
+  select(-`Alnus(Alder)`) %>% 
   select(-`Hickory/Pecan`)
   
 #   Remove totals
@@ -270,10 +275,13 @@ df_old <-
 df_old <- df_old %>% 
   select(-contains("Total"))
 
+# get rid of columns that are all NA
+
+df_old <- df_old[colSums(!is.na(df_old)) > 0]
+
 ```
 
-
-##  merge and save data
+## merge and save data
 
 ```{r save}
 
@@ -282,7 +290,3 @@ df <- bind_rows(df, df_old)
 saveRDS(df, paste0(savepath, "MasterPollenData.rds"))
 
 ```
-
-
-
-
