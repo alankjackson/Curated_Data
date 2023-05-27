@@ -290,3 +290,66 @@ df <- bind_rows(df, df_old)
 saveRDS(df, paste0(savepath, "MasterPollenData.rds"))
 
 ```
+
+##        Attach low, med. heavy, extreme qualifiers and Tree or Grass or Weeds
+
+```{r qualifiers}
+
+# Classify as tree, weed, or grass
+Classify <- tribble(
+  ~name,                        ~class,
+"Ashe_JuniperOrBald_Cypress", "Tree",
+"Maple", "Tree",
+"Alnus", "Tree",
+"Birch", "Tree",
+"Hickory_Pecan", "Tree",                
+"Hackberry",    "Tree",                   
+"Hazelnut", "Tree",
+"Cedar", "Tree",
+"Ash", "Tree",
+"Walnut", "Tree",
+"Sweet_Gum", "Tree",
+"Mulberry", "Tree",
+"Pine", "Tree",
+"Sycamore", "Tree",
+"Cotton_Wood", "Tree",
+"Oak", "Tree",
+"Willow", "Tree",
+"Linden", "Tree",
+"Elm", "Tree",
+"Ragweed", "Weed",
+"Sagebrush", "Weed",
+"Aster", "Weed",
+"Sedge", "Weed",
+"Plantago", "Weed",
+"Sorrel", "Weed",
+"Cattail", "Weed",
+"Nettle", "Weed",
+"Amaranth", "Weed",
+"Black_Gum",  "Tree",
+"Black_Walnut",  "Tree",
+"Glandular_Mesquite",  "Tree",
+"Osage_Orange",  "Tree",
+"Gingko_Biloba",   "Tree",
+"BurweedOrMarshelder",  "Weed",
+"Dog_Fennel",  "Weed",
+"Lambs_Quarters",  "Weed",
+"Partridge_Pea",  "Weed",
+"Plum_Grannet",  "Weed",
+"Other_Weed",  "Weed",
+"Other_Tree",  "Tree",
+"Wild_Carrot",  "Weed"
+)
+
+
+df <- df %>% 
+  mutate(Qualifier = case_when(
+    
+  ))
+
+
+```
+
+
+
+
