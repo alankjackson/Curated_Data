@@ -25,7 +25,7 @@ for actually drawing county outlines on a map.
 Counties <- read_csv(paste0(path, "Texas_County_Boundaries.csv")) %>% 
   select(-SHAPE_Length, -SHAPE_Area)
 
-# The state has problems spelling this corectly
+# The state has problems spelling this correctly
 
 Counties$CNTY_NM[Counties$CNTY_NM=="De Witt"] <- "DeWitt"
 
@@ -37,6 +37,23 @@ Counties$FIPS_ST_CNTY_CD <- str_remove(Counties$FIPS_ST_CNTY_CD, "^48")
 # Save file out
 
 saveRDS(Counties, paste0(path, "County_Names.rds"))
+
+```
+
+##        Read in the shapefile
+
+```{r read shapefile}
+
+County_outlines <- sf::st_read(paste0(path, "County.shp"))
+
+# The state has problems spelling this correctly
+
+County_outlines$CNTY_NM[Counties$CNTY_NM=="De Witt"] <- "DeWitt"
+
+County_outlines <- County_outlines %>% 
+  sf::st_as_sf()  
+
+saveRDS(County_outlines, paste0(path, "County_Outlines.rds"))
 
 ```
 
