@@ -279,9 +279,21 @@ https://gishub-h-gac.hub.arcgis.com/datasets/H-GAC::hgac-counties-political
 
 City_and_County_bdys/HGAC_County_bdys.rds
 
+-------------------------------
+Texas Flood Planning Regions
 
+downloaded 11/4/2023
+https://www.arcgis.com/home/item.html?id=177ba83b8e1a405692ba8886110df08f
 
+FloodPlanningRegions/Regional_Flood_Planning_Groups.Rds
 
+-------------------------------
+Texas Regional Water Planning Areas
+
+downloaded 11/4/2023
+https://www.twdb.texas.gov/mapping/gisdata.asp
+
+Water_Planning_Areas.Rds
 
 
 
