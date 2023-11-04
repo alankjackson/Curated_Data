@@ -1,0 +1,50 @@
+---
+title: "Regional Water Planning Areas"
+author: "Alan Jackson"
+format: html
+editor: visual
+---
+
+## Download data
+
+Data for regional water planning areas polygons from
+https://www.twdb.texas.gov/mapping/gisdata.asp
+
+Manual download the shapefile
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(leaflet)
+library(leafem)
+
+googlecrs <- 4326
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/WaterPlanningAreas/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r read and write}
+
+fgdb <- paste0(path, "TWDB_RWPAs_2014.dbf")
+
+# Read the feature class
+temp <- sf::st_read(fgdb)
+temp <- sf::st_transform(temp, googlecrs)
+# sf::st_crs(temp) <- googlecrs
+
+summary(temp)
+
+leaflet(temp) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons(weight=1) %>% 
+  addStaticLabels(label=temp$Label,
+                  style = list("color" = "red", "font-weight" = "bold"))
+
+
+saveRDS(temp, paste0(path, "Water_Planning_Areas.Rds"))
+
+
+```
