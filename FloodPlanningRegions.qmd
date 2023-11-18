@@ -46,5 +46,13 @@ leaflet(temp) %>%
 
 saveRDS(temp, paste0(path, "Regional_Flood_Planning_Groups.Rds"))
 
+map <- leaflet(temp) %>% 
+  leaflet::setView(lng = -95.3103, lat = 29.7752, zoom = 8 ) %>%   
+  addTiles() %>% 
+  addPolygons(weight=1) %>% 
+  addStaticLabels(label=temp$RFPG,
+                  style = list("color" = "red", "font-weight" = "bold"))
+
+htmlwidgets::saveWidget(map, paste0(path, "test.html"), selfcontained = TRUE)
 
 ```
