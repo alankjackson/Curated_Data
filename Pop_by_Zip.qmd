@@ -23,7 +23,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 
 df <- read_excel(paste0(path, "Texas_DemographicsByZipCode_sample.xlsx"), 
-                 skip=6, col_names=FALSE)  
+                 skip=6, col_names=FALSE) %>% 
+  select(Zip=1, Pop=6)
+
+saveRDS(df, paste0(path, "Zipcode_Pop_2022.rds"))
 
 ```
 
