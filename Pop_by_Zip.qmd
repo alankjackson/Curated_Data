@@ -1,0 +1,29 @@
+---
+title: "Pop by Zip"
+author: "Alan Jackson"
+format: html
+editor: source
+---
+
+## Read in Pop by zip from excel file
+
+```{r setup}
+
+library(tidyverse)
+library(readxl) # read excel files
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/ZipPop/"
+
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+#       Read in and check excel file
+
+```{r}
+
+df <- read_excel(paste0(path, "Texas_DemographicsByZipCode_sample.xlsx"), 
+                 skip=6, col_names=FALSE)  
+
+```
+
