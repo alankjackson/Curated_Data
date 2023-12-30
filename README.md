@@ -295,5 +295,13 @@ https://www.twdb.texas.gov/mapping/gisdata.asp
 
 Water_Planning_Areas.Rds
 
+-------------------------------
+Population by zipcode in Texas
+
+downloaded excel file from https://www.texas-demographics.com/zip_codes_by_population
+which has pop figures for 2022
+
+Zipcode_Pop_2022.rds
+
 
 
