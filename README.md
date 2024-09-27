@@ -151,6 +151,17 @@ CSV file of location and address
 Download on 28 Mar 2022
 
 ---------------------------
+Address points for street addresses, city of Houston
+
+gdb file of locations and addresses
+
+Download from https://mycity.maps.arcgis.com/home/item.html?id=aeb4bb6b3b25471caf4d883bf979424d
+
+accessed via https://cohgis-mycity.opendata.arcgis.com/
+
+Download Sept 27, 2024
+
+---------------------------
 Pollen and Mold count data for City of Houston
 
 https://www.houstontx.gov/health/Pollen-Mold/pollen-archives.html
