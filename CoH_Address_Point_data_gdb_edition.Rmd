@@ -1,0 +1,1300 @@
+---
+title: "Read in CoH Address gdb data"
+author: "Alan Jackson"
+date: '2024-09-27'
+format: html
+description: "Create a new file suitable for geocoding from the City of Houston address point data"
+image: "cover.png"
+categories:
+  - Mapping
+  - Data
+execute:
+  freeze: auto  # re-render only when source changes
+  warning: false
+editor: source
+---
+
+##    Read a clean COH address data
+
+Data downloaded on Sept 27, 2024 from
+
+https://mycity.maps.arcgis.com/home/item.html?id=aeb4bb6b3b25471caf4d883bf979424d
+
+which can be found from the page
+
+https://cohgis-mycity.opendata.arcgis.com/
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/CoH_Address_Points/"
+
+googlecrs <- 4326
+filename <- "SITEADDRESSES_20240808.gdb"
+
+layers <- sf::st_layers(paste0(path, filename))
+
+df <- sf::st_read(paste0(path, filename), 
+                    layer = "SiteAddresses")
+
+corrections <- NULL # collect what has been changed
+```
+
+## Quality control and Explore
+
+Data read in mostly as character, except for lat long and xy
+coordinates.
+
+Let's explore each column, with an eye towards possibly transforming
+them to a better data type (dates should be dates, for example)
+
+```{r QC and Explore}
+# Longitude
+
+df %>% select(X) %>% 
+  ggplot() +
+  geom_histogram(aes(x=X))
+
+# Latitude
+
+df %>% select(Y) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Y))
+
+# Objectid
+
+#   Can I safely convert to numeric?
+
+df %>% select(OBJECTID) %>% 
+  mutate(Objectid = as.integer(OBJECTID)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Objectid))
+
+df %>% select(OBJECTID) %>% 
+  mutate(Objectid = as.integer(OBJECTID)) %>% 
+  unique() %>% 
+  count()
+  
+# ID (same question)
+
+df %>% select(ID) %>% 
+  mutate(Id = as.integer(ID)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Id))
+
+df %>% select(ID) %>% 
+  mutate(Objectid = as.integer(ID)) %>% 
+  unique() %>% 
+  count()
+
+# ADDR_ID (same question)
+
+df %>% select(ADDR_ID) %>% 
+  mutate(Addr_id = as.integer(ADDR_ID)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Addr_id))
+
+df %>% select(ADDR_ID) %>% 
+  mutate(Objectid = as.integer(ADDR_ID)) %>% 
+  unique() %>% 
+  count()
+
+# TYPES
+
+df %>% select(TYPES) %>% 
+  filter(!is.na(TYPES)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=TYPES), stat="count") +
+  coord_flip()
+
+# STATUS
+
+df %>% select(STATUS) %>% 
+  ggplot() +
+  geom_histogram(aes(x=STATUS), stat="count") +
+  coord_flip()
+```
+
+Lat longs, and all the ID fields seem well enough behaved. Not sure
+about TYPES, it seems to be left blank most of the time, so its
+usefulness is questionable.
+
+Status is curious. It is always filled in, and some of the meaning seem
+obvious. ABD is obviously abandoned. CNTY = county, COH = City of
+Houston. I think CP means that the location was reported? by Center
+Point? I don't know what the rest mean. Not really a clue. Except that
+UTA may have something to do with utilities.
+
+```{r QC and Explore more}
+
+# STREET_NUM
+
+df %>% select(STREET_NUM) %>% 
+  filter(str_starts(STREET_NUM, " ")) # test for beginning blank
+
+df %>% select(STREET_NUM) %>% 
+  filter(str_detect(STREET_NUM, " [0-9]")) # test for blank then number
+  
+dfnew <- df %>% 
+  mutate(STREET_NUM = str_remove(STREET_NUM, "^[1-2]+/+[1-9]+")) %>% 
+  mutate(STREET_NUM = str_remove(STREET_NUM, "[^0-9A-Z#/\\s]")) %>% 
+  mutate(Street_alpha = str_trim(str_remove(STREET_NUM, "^\\d+")))  
+
+corrections <- df %>% 
+  filter(str_detect(STREET_NUM, "^[1-2]+/+[1-9]+") |
+         str_detect(STREET_NUM, "[^0-9A-Z#/\\s]")) %>%  
+  mutate(change="Extraneous stuff in STREET_NUM")
+
+dfnew %>% 
+  filter(Street_alpha!="") %>% 
+  ggplot() +
+  geom_histogram(aes(x=Street_alpha), stat="count", na.rm=TRUE) +
+  coord_flip() 
+  
+tmp <-   dfnew %>% 
+  mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
+  filter(Street_num>49999) %>% 
+  mutate(change="STREET_NUM > 49999, which fails in spot checks") %>% 
+  select(-Street_num, -Street_alpha)
+
+corrections <- bind_rows(corrections, tmp)
+
+dfnew <- dfnew %>% 
+  mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
+  filter(Street_num<49999)  
+
+dfnew %>% 
+  ggplot() +
+  geom_histogram(aes(x=Street_num)) 
+  
+
+```
+
+### STREET_NUM
+
+Now it gets messy.
+
+The street numbers have junk in them - sometimes.
+
+4107 B 606 #3 1/2 35 1/2 13410.
+
+So we'll try to clean up at least most of this. We'll create two new
+variables, Street_num and Street_alpha.
+
+```{r QC and explore even more}
+
+#   Fraction
+
+dfnew %>% 
+  filter(FRACTION!="") %>% 
+  select(FRACTION) %>% 
+  unique
+
+```
+
+Hmm... some trash in the FRACTION field. Period, square bracket,
+slash... Sometimes it matches what I have designated Street_alpha, but
+not always.
+
+```{r PREFIX}
+
+dfnew %>% 
+  filter(PREFIX!="") %>% 
+  select(PREFIX) %>% 
+  unique
+
+tmp <- dfnew %>% 
+  filter(str_detect(PREFIX, "[a-z]|[^NSEW]")) %>% 
+  mutate(change="PREFIX not one of N,S,E,W") %>% 
+  select(-Street_num, -Street_alpha)
+
+corrections <- bind_rows(corrections, tmp)
+
+dfnew <- 
+dfnew %>% 
+  mutate(PREFIX=str_to_upper(PREFIX))
+
+dfnew$PREFIX[!is.na(dfnew$PREFIX) & str_detect(dfnew$PREFIX, "[^NSEW]")] <- NA
+
+```
+
+A few bad entries. the "C" is pulled from the street number so can be
+deleted. The lower case directions can be repaired.
+
+
+##        Street Names
+
+Look at low occurrence names. 
+- names that occur only once
+  - update names that are < 1060 ft from a 1 char change in 3 names in the zip
+  - then 2 character changes < 300 feet with >= 5 names in zip
+  - then 3 character changes < 300 feet with >= 9 names in zip
+- names that occur twice
+  - update names that are < 500 ft from a 1 char change in 8 names in the zip
+
+```{r STREET NAME}
+
+euclidean <- function(a, b) sqrt(sum((a - b)^2))
+
+dfnew %>% count(STREET_NAME, sort=TRUE) %>% 
+  filter(n<5)
+
+dfnew %>% count(STREET_NAME, sort=TRUE) %>% 
+  filter(n<10) %>% 
+  ggplot() +
+  geom_histogram(aes(x=n))
+
+#   We have some bad names. Let's look at low occurrence names and have nearby 
+#   names vote on the proper name
+
+#   First shrink dataset size, then make an sf object
+#   Nah, just use zipcode and text distance
+#   But then look at physical distance as a fine tuning check
+
+#   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
+
+dftest <- 
+dfnew %>% 
+#  head() %>% 
+  #select(OBJECTID, STREET_NAME, Street_num, ZIPCODE)# %>% 
+  select(OBJECTID, STREET_NAME, Street_num, ZIPCODE, X_COORD, Y_COORD)# %>% 
+  #sf::st_as_sf(., coords=c("X_COORD", "Y_COORD"))
+
+#   data frame of single occurrence names
+df_singles <- dftest %>% 
+  group_by(STREET_NAME) %>% 
+  mutate(count=n()) %>% 
+  filter(count<2) %>% 
+  select(-count) %>% 
+  filter(str_length(STREET_NAME)>3) %>% #  eliminate short names
+  filter(!str_detect(STREET_NAME, "STREET")) %>% # eliminate A STREET, B STREET
+  filter(!str_detect(STREET_NAME, "^\\d+TH")) %>% # eliminate 4TH, 5TH, etc
+  filter(!str_detect(STREET_NAME, "^CR \\d+")) # eliminate county roads
+
+#   data frame of double occurrence names
+df_doubles <- dftest %>% 
+  group_by(STREET_NAME) %>% 
+  mutate(count=n()) %>% 
+  filter(count==2) %>% 
+  select(-count) %>% 
+  filter(str_length(STREET_NAME)>3) %>% #  eliminate short names
+  filter(!str_detect(STREET_NAME, "STREET")) %>% # eliminate A STREET, B STREET
+  filter(!str_detect(STREET_NAME, "^\\d+TH")) %>% # eliminate 4TH, 5TH, etc
+  filter(!str_detect(STREET_NAME, "^CR \\d+")) # eliminate county roads
+
+##    function to get text distances and geometric distances
+
+get_corrections <- function(df_test, df_base, text_dist, geom_dist, min_votes){
+  tmp <- NULL
+  for (i in 1:nrow(df_test)) {
+    foo <- df_test[i,]
+    foobar <- 
+    df_base %>% filter(ZIPCODE==foo$ZIPCODE) %>% 
+      mutate(adist=adist(STREET_NAME, foo$STREET_NAME),
+             bad_X=foo$X_COORD,
+             bad_Y=foo$Y_COORD,
+             bad_num=foo$Street_num,
+             bad_name=foo$STREET_NAME,
+             bad_id=foo$OBJECTID) %>% 
+      filter(adist == text_dist) %>% 
+      mutate(eucdist=sqrt((X_COORD - bad_X)^2 +
+                          (Y_COORD-bad_Y)^2)) %>% 
+      group_by(STREET_NAME) %>%
+         summarize(n=n(),
+                   Street_num=last(bad_num),
+                   STREET_NAME=last(STREET_NAME),
+                   bad_name=last(bad_name),
+                   bad_id=last(bad_id),
+                   min_dist=suppressWarnings(min(eucdist))
+                   ) %>%
+      ungroup() %>%
+      filter(n>min_votes,
+             min_dist<geom_dist)
+    
+      tmp <- bind_rows(tmp, foobar) 
+  }
+  return(tmp)
+}
+
+#  Loop through singles, get distances to all in zipcode, then get text distance
+
+tmp <- get_corrections(df_singles, dftest, 1, 1060, 3)
+
+df_singles <- df_singles[!df_singles$OBJECTID %in% tmp$bad_id,]
+tmp[duplicated(tmp$bad_id),]
+#     Get rid of duplicates
+tmp <- tmp %>% filter(!STREET_NAME=="INTERCONTINENT",
+                      !STREET_NAME=="MARY")
+
+foo <- df[df$OBJECTID %in% tmp$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp[OBJECTID %in% tmp$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+
+#   Singles with 2 letter changes
+tmp2 <- get_corrections(df_singles, dftest, 2, 300, 5)
+
+df_singles <- df_singles[!df_singles$OBJECTID %in% tmp2$bad_id,]
+df_singles <- df_singles %>% filter(!OBJECTID=="76158") %>% 
+                             filter(!OBJECTID=="705381")
+tmp2[duplicated(tmp2$bad_id),]
+
+foo <- df[df$OBJECTID %in% tmp2$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp2[OBJECTID %in% tmp2$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+
+#   Singles with 3 letter changes
+tmp3 <- get_corrections(df_singles, dftest, 3, 300, 9)
+tmp3[duplicated(tmp3$bad_id),]
+
+foo <- df[df$OBJECTID %in% tmp3$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp3[OBJECTID %in% tmp3$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+    
+#------   Now do doubles
+
+tmp4 <- get_corrections(df_doubles, dftest, 1, 500, 8)
+tmp4[duplicated(tmp4$bad_id),]
+
+foo <- df[df$OBJECTID %in% tmp4$bad_id,] %>% 
+  mutate(change=paste("Corrected STREET_NAME to",
+                      tmp4[OBJECTID %in% tmp4$bad_id,]$STREET_NAME))
+#   Add corrections for singles
+corrections <- bind_rows(corrections, foo)
+    
+
+#------ Now update the original by adding a new field
+
+dfnew <- dfnew %>% mutate(New_street=STREET_NAME)
+
+dfnew[dfnew$OBJECTID %in% tmp$bad_id,]$New_street <- tmp$STREET_NAME 
+dfnew[dfnew$OBJECTID %in% tmp2$bad_id,]$New_street <- tmp2$STREET_NAME 
+dfnew[dfnew$OBJECTID %in% tmp3$bad_id,]$New_street <- tmp3$STREET_NAME 
+dfnew[dfnew$OBJECTID %in% tmp4$bad_id,]$New_street <- tmp4$STREET_NAME 
+
+##########    Let's look at ST vs. SAINT
+
+eraseme <- 
+dt %>% as_tibble() %>%
+  filter(str_detect(Street_name, "^SAINT |^ST ")) %>%
+  mutate(pre=str_extract(Street_name, "^SAINT |^ST ")) %>% 
+  mutate(post=str_remove(Street_name, "^SAINT |^ST ")) %>% 
+  group_by(post, pre, Zipcode) %>% 
+    summarize(n=n())
+
+##########    Now fix a few specific problems that appear
+
+Old_street <- c("H M C", "^F M ", "^F.M. ",
+                "^JOHN A$" ,"^AVE " ,"^H R$" ,"^T K C$", " SQ$",
+                "^ST ")
+New_street <- c("H MARK CROSSWELL JR", "FM ", "FM ", 
+                "JOHN-A", "AVENUE ", "H AND R", "TKC", " SQUARE",
+                "SAINT ")
+
+dfnew[dfnew$New_street=="H M C",]$New_street <- "H MARK CROSSWELL JR"
+dfnew[dfnew$New_street=="2136TH F M 2920",]$New_street <- "FM 2920"
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^F M ", "FM "))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^F.M. ", "FM "))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^JOHN A$", "JOHN-A"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^AVE ", "AVENUE "))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^H R$", "H AND R"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^T K C$", "TKC"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street," SQ$", " SQUARE"))
+dfnew <- dfnew %>% mutate(New_street=str_replace(New_street,"^ST ", "SAINT "))
+
+ObjID <- df %>% filter(str_detect(STREET_NAME, 
+                                  paste(Old_street, collapse="|")))  
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change=paste("Corrected street name to", 
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$New_street)) 
+corrections <- bind_rows(corrections, foo)
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_1"))
+saveRDS(corrections, paste0(path, "corrections.Rds"))
+
+```
+
+```{r reload}
+
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_1"))
+
+```
+
+```{r suffixes}
+
+dfnew %>% 
+  filter(SUFFIX!="") %>% 
+  select(SUFFIX) %>% 
+  unique
+
+foo <- df[!is.na(df$SUFFIX) & str_detect(df$SUFFIX, "[^NSEW]"),] %>% 
+  mutate(change="Corrected SUFFIX by deleting bogus value")
+
+corrections <- bind_rows(corrections, foo)
+
+dfnew$SUFFIX[!is.na(dfnew$SUFFIX) & str_detect(dfnew$SUFFIX, "[^NSEW]")] <- NA
+
+```
+
+```{r street type}
+
+
+dfnew %>% 
+  filter(STREET_TYPE!="") %>% 
+  select(STREET_TYPE) %>% 
+  unique
+
+Street_types <- 
+dfnew %>% 
+      group_by(STREET_TYPE) %>%
+         summarize(n=n(),
+                   STREET_TYPE=last(STREET_TYPE)) %>% 
+  arrange(-n)
+
+#   a lot of mess here. Will use a similar strategy as used for street names.
+#   look at nearby friends and try to grab the type from them. Use total dataset
+#   n value to establish the "standard".
+#   Two tasks - look for missing types by checking nearby friends
+#   And check the existing type against the standards
+
+Allowed_types <- c(
+  "ALY", "ANX", "ARC", "AVE", "BYU", "BCH", "BND", "BLF", "BLFS", "BTM", "BLVD",
+  "BR", "BRG", "BRK", "BRKS", "BG", "BGS", "BYP", "CP", "CYN", "CPE", "CSWY", "CTR",
+  "CTRS", "CIR", "CIRS", "CLF", "CLFS", "CLB", "CMN", "CMNS", "COR", "CORS",
+  "CRSE", "CT", "CTS", "CV", "CVS", "CRK", "CRES", "CRST", "XING", "XRD", "XRDS",
+  "CURV", "DL", "DM", "DV", "DR", "DRS", "EST", "ESTS", "EXPY", "EXT", "EXTS", "FALL",
+  "FLS", "FRY", "FLD", "FLDS", "FLT", "FLTS", "FRD", "FRDS", "FRST", "FRG", "FRGS",
+  "FRK", "FRKS", "FT", "FWY", "GDN", "GDNS", "GTWY", "GLN", "GLNS", "GRN", "GRNS",
+  "GRV", "GRVS", "HBR", "HBRS", "HVN", "HTS", "HWY", "HL", "HLS", "HOLW", "INLT",
+  "IS", "ISS", "ISLE", "JCT", "JCTS", "KY", "KYS", "KNL", "KNLS", "LK", "LKS",
+  "LAND", "LNDG", "LN", "LGT", "LGTS", "LF", "LCK", "LCKS", "LDG", "LOOP", "MALL",
+  "MNR", "MNRS", "MDW", "MDWS", "MEWS", "ML", "MLS", "MSN", "MTWY", "MT", "MTN",
+  "MTNS", "NCK", "ORCH", "OVAL", "OPAS", "PARK", "PKWY", "PASS", "PSGE", "PATH",
+  "PIKE", "PNE", "PNES", "PL", "PLN", "PLNS", "PLZ", "PT", "PTS", "PRT", "PRTS",
+  "PR", "RADL", "RAMP", "RNCH", "RPD", "RPDS", "RST", "RDG", "RDGS", "RIV", "RD",
+  "RDS", "RTE", "ROW", "RUE", "RUN", "SHL", "SHLS", "SHR", "SHRS", "SKWY", "SPG",
+  "SPGS", "SPUR", "SQ", "SQS", "STA", "STRA", "STRM", "ST", "STS", "SMT", "TER",
+  "TRWY", "TRCE", "TRAK", "TRFY", "TRL", "TRLR", "TUNL", "TPKE", "UPAS", "UN",
+  "UNS", "VLY", "VLYS", "VIA", "VW", "VWS", "VLG", "VLGS", "VL", "VIS", "WALK",
+  "WALL", "WAY", "WAYS", "WL", "WLS")
+
+
+#   Let's look for erroneous types
+
+Street_types %>% filter(!is.na(STREET_TYPE)) %>% 
+  filter(!STREET_TYPE %in% Allowed_types)
+
+#   Well that is simple enough. In Houston, apparently, "Speedway" is a street
+#   type, so I'll leave that one alone. The rest I can update to the correct
+#   value.
+
+foo <- df %>% 
+  filter(str_detect(STREET_TYPE, "^PKY$|^ROAD$|^LANE$|^TWY$")) %>% 
+  mutate(change="Corrected STREET_TYPE to standard USPS values (except SPWY)")
+
+corrections <- bind_rows(corrections, foo)
+
+dfnew <- dfnew %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^PKY$", "PKWY")) %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^ROAD$", "RD")) %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^LANE$", "LN")) %>% 
+  mutate(STREET_TYPE=str_replace(STREET_TYPE, "^TWY$", "CT"))  # not a tollway
+  
+#   Look at the NA's to see if they make sense
+
+#   For each street/zip pair sum up # types
+
+tmp <- 
+dfnew %>% group_by(ZIPCODE, STREET_NAME) %>% 
+      summarise(n=n(),
+                sumNA = sum(is.na(STREET_TYPE)),
+                NotNAs=list(unique(STREET_TYPE[!is.na(STREET_TYPE)]))) %>% 
+  filter(!sumNA==n) %>% 
+  mutate(NotNA=n-sumNA) %>% 
+  mutate(Flag=lengths(NotNAs)) %>% 
+  filter(sumNA>0) %>% 
+  mutate(NotNAs=paste(NotNAs)) %>% # convert list to string 
+  filter(Flag==1)  # remove ambiguous cases where there are multiple types
+
+#   Let's first fix things that are not NA that should be
+#   
+
+#   Add new field so we retain original values
+
+dfnew <- dfnew %>% mutate(Street_type = STREET_TYPE) 
+
+tmp_rm_not_na <- tmp %>% 
+  filter(n>9) %>% # need at least 10 to believe statistics
+  mutate(foo=(NotNA/n)) %>% 
+  filter((NotNA/n)<0.151) %>% 
+  filter(!NotNAs=="CT") # don't trust 'court', leave alone
+
+#   Apply what is left to NA that field
+
+for (i in 1:nrow(tmp_rm_not_na)){
+  dfnew$Street_type[(dfnew$ZIPCODE==tmp_rm_not_na[[i,1]]) & 
+          (dfnew$STREET_NAME==tmp_rm_not_na[[i,2]])] <- NA
+}
+
+ObjID <- dfnew %>% filter(!is.na(STREET_TYPE),
+                 is.na(Street_type))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Removed STREET_TYPE") 
+corrections <- bind_rows(corrections, foo)
+  
+# Now let's fix things that are NA but shouldn't be
+
+tmp_rm_na <- tmp %>% 
+  filter(n>9) %>% # need at least 10 to believe statistics
+  mutate(foo=(NotNA/n)) %>% 
+  filter((NotNA/n)>0.810) %>% 
+  filter(!NotNAs=="CT") %>% # don't trust 'court', leave alone
+  filter(!NotNAs=="CIR") %>% # don't trust 'circle', leave alone
+  filter(!NotNAs=="PL") # don't trust 'place', leave alone
+
+#   Apply what is left to fill that field
+
+for (i in 1:nrow(tmp_rm_na)){
+  dfnew$Street_type[(dfnew$ZIPCODE==tmp_rm_na[[i,1]]) & 
+          (dfnew$STREET_NAME==tmp_rm_na[[i,2]])] <- tmp_rm_na[[i,5]]
+}
+  
+ObjID <- dfnew %>% filter(is.na(STREET_TYPE),
+                 !is.na(Street_type))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change=paste("Added STREET_TYPE of", 
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Street_type)) 
+corrections <- bind_rows(corrections, foo)
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_2"))
+saveRDS(corrections, paste0(path, "corrections_2.Rds"))
+
+```
+
+##  Prefix redux
+
+Many prefixes are missing. We will try to use nearby address points to fill in
+the Prefix where it seems safe to do so.
+
+
+
+```{r revisit prefix}
+
+#   Can we grab nearby prefixes to repair missing ones?
+
+#   Let's shrink dataset size
+dftest <- 
+dfnew %>% 
+  select(OBJECTID, Street_num, Street_alpha, PREFIX, New_street, 
+         Street_type, ZIPCODE, X_COORD, Y_COORD) 
+
+#   Now start analysis by street name, type, and zipcode
+
+tmp <- 
+dftest %>% group_by(ZIPCODE, New_street, Street_type) %>% 
+      summarise(n=n(),
+                sumNA = sum(is.na(PREFIX)),
+                sumE = sum(PREFIX=="E", na.rm=TRUE),
+                sumW = sum(PREFIX=="W", na.rm=TRUE),
+                sumN = sum(PREFIX=="N", na.rm=TRUE),
+                sumS = sum(PREFIX=="S", na.rm=TRUE)) %>%
+  mutate(singlet = n-sumNA) %>% 
+  filter(!sumNA==n) %>% 
+  filter(sumNA>0) %>% 
+  mutate(percentNA = sumNA/n) 
+
+#   Take singlet prefixes with total n>10 and find minimum distance to
+#   a cousin
+
+#   data frame of single occurrence PREFIXes
+df_singles <- tmp %>% 
+  filter(n>10) %>% 
+  filter(singlet==1) %>% 
+  filter(!Street_type == "CIR") %>% # eliminate circles
+  filter(!Street_type == "CT") %>%   # eliminate courts
+  mutate(nearest=NA)
+
+for (i in 1:nrow(df_singles)) {
+  tmp_sing <- dftest %>% filter((ZIPCODE==df_singles[i,]$ZIPCODE) &
+                                (New_street==df_singles[i,]$New_street) & 
+                                (Street_type==df_singles[i,]$Street_type))
+  
+  bad_X <- tmp_sing[!is.na(tmp_sing$PREFIX),]$X_COORD
+  bad_Y <- tmp_sing[!is.na(tmp_sing$PREFIX),]$Y_COORD
+  
+  tmp_sing <- tmp_sing %>% 
+    mutate(dist=sqrt((X_COORD - bad_X)^2 +
+                     (Y_COORD-bad_Y)^2)) %>% 
+    arrange(dist)
+  
+  df_singles[i,]$nearest <- tmp_sing[2,]$dist
+}
+
+#   Let's use a 150 foot cutoff. Further away than that and I'll ignore it.
+
+df_singles <- df_singles %>% filter(nearest<150)
+
+dfnew <- dfnew %>% mutate(Prefix=PREFIX)
+  
+for (i in 1:nrow(df_singles)){
+  dfnew[(dfnew$New_street %in% df_singles[i,]$New_street) &
+        (!is.na(dfnew$PREFIX)) &
+        (dfnew$ZIPCODE %in% df_singles[i,]$ZIPCODE) &
+        (dfnew$Street_type %in% df_singles[i,]$Street_type),]$Prefix <- NA
+}
+
+ObjID <- dfnew %>% filter(!is.na(PREFIX), # who did we change?
+                 is.na(Prefix))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Removed PREFIX") 
+corrections <- bind_rows(corrections, foo)
+
+#######   now let's look at NA's that shouldn't be.
+#   This is more complicated since the needed prefix could be E or W say.
+#   About 0.1 for the percent cutoff seems reasonable
+
+#   data frame of candidates
+df_cands <- tmp %>% 
+  filter(n>10) %>% 
+  filter(percentNA<0.1) %>% 
+  filter(!Street_type == "CIR") %>% # eliminate circles
+  filter(!Street_type == "CT")  # eliminate courts
+
+#   Expand this out to all the individual points in prep for distance calc
+#   Let's shrink dataset size
+dftest <- 
+dfnew %>% 
+  select(OBJECTID, Street_num, Street_alpha, Prefix, New_street, 
+         Street_type, ZIPCODE, X_COORD, Y_COORD) 
+dftest$Nearest <- 0
+dftest$Minimus <- 0
+dftest$Neighbor_object <- NA
+
+for (i in 1:nrow(df_cands)){
+#for (i in 1:3){
+  print(paste(i, "---->", df_cands[i,]$New_street))
+  eraseme <- dftest %>% 
+    filter((ZIPCODE %in% df_cands[i,]$ZIPCODE) &
+           (New_street %in% df_cands[i,]$New_street) &
+           (Street_type %in% df_cands[i,]$Street_type))  
+  
+  targets <- eraseme %>% filter(is.na(Prefix)) %>% 
+    mutate(Prefix=NA,
+           dist=0)
+  
+  for (j in 1:nrow(targets)){
+    foo <-   eraseme %>% 
+    summarize(nearest=sqrt((X_COORD -targets[j,]$X_COORD)^2 +
+                        (Y_COORD-targets[j,]$Y_COORD)^2),
+              prefix=Prefix,
+              object=OBJECTID) %>% 
+      arrange(nearest) %>% 
+      drop_na()
+    
+    dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Prefix <- foo[1,]$prefix
+    dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Nearest <- foo[1,]$nearest
+    dftest[targets[j,]$OBJECTID == dftest$OBJECTID,]$Neighbor_object <- foo[1,]$object
+    #print("--b--")
+  }
+}
+
+dftest %>% filter(Nearest>0,
+                 Nearest<300) %>% 
+  ggplot() +
+  geom_histogram(aes(x=Nearest))
+
+#   150 ft feels like the furthest I can do with confidence.
+
+foo <- dftest %>% filter(Nearest<150,
+                         Nearest>0)
+                   
+dfnew[dfnew$OBJECTID %in% foo$OBJECTID,]$Prefix <- foo$Prefix
+
+ObjID <- dfnew %>% filter(is.na(PREFIX), # who did we change?
+                          !is.na(Prefix))   
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Added PREFIX based on neighbors") 
+corrections <- bind_rows(corrections, foo)
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_3"))
+saveRDS(corrections, paste0(path, "corrections_3.Rds"))
+```
+
+
+```{r City}
+
+dfnew$CITY %>% unique() %>% sort()
+
+
+```
+
+City names look okay.
+
+```{r zips}
+
+dfnew$ZIPCODE %>% unique() %>% sort()
+
+```
+
+Zipcodes look okay.
+
+```{r sources}
+
+dfnew$SOURCES %>% unique() %>% sort()
+
+
+```
+
+A little ambiguity between "COH" and "City of Houston", also CP and Centerpoint
+Energy, Center Point, and CE. And some other miscellaneous cleanup.
+```{r last edit date}
+
+dfnew %>% mutate(date=lubridate::ymd_hms(last_edited_date)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=date))
+
+dfnew$Street_num <- as.character(dfnew$Street_num)
+dfnew <- dfnew %>% replace_na(list(Prefix="", Street_type=""))
+dfnew <- dfnew %>% rename(Street_name=New_street)
+dfnew <- dfnew %>% mutate(CITY=str_to_upper(CITY))
+
+```
+
+No last edited dates before 2015.
+
+```{r}
+#   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
+#   There are Y values missing...
+dftest <- 
+dfnew %>% 
+  #head(10) %>% 
+  select(OBJECTID, STREET_NAME, Street_num, ZIPCODE, X, Y, X_COORD, Y_COORD) %>% 
+  #select(OBJECTID, STREET_NAME, Street_num, ZIPCODE, X_COORD, Y_COORD)# %>% 
+  sf::st_as_sf(., coords=c("X", "Y"))
+
+sf::st_crs(dftest) <- googlecrs
+
+foo <- sf::st_transform(dftest, crs="EPSG:2278")
+
+#foo <- 
+foo %>% 
+  mutate(xy=sf::st_coordinates(foo))
+
+foo2 <- sf::st_coordinates(foo)
+foo$X <- foo2[,1]
+foo$Y <- foo2[,2]
+
+foo %>% mutate(Dx=X_COORD-X,
+               Dy=Y_COORD-Y) %>% 
+  filter(Dy>-5) %>% 
+  filter(Dy<0) %>% 
+  ggplot(aes(x=Dy)) +
+  geom_histogram()
+
+foo %>% mutate(Dx=X_COORD-X,
+               Dy=Y_COORD-Y) %>% 
+  filter(Dx>0) %>% 
+  filter(Dx<5) %>% 
+  ggplot(aes(x=Dx)) +
+  geom_histogram()
+
+#     Looks good enough. Let's recover the data with bogus Y coordinates.
+
+ObjID <- dfnew %>% 
+  filter(Y_COORD<13000000) # pull out records with bad Y coordinate
+
+foo[foo$OBJECTID %in% ObjID$OBJECTID,]
+
+dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Y_COORD <- 
+  unname(foo[foo$OBJECTID %in% ObjID$OBJECTID,]$Y)
+
+foo <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change="Repaired Y_COORD by reprojecting") 
+corrections <- bind_rows(corrections, foo)
+
+#   Safety save
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_4"))
+saveRDS(corrections, paste0(path, "corrections_4.Rds"))
+
+```
+
+##        More zipcode stuff. Some are just plain wrong
+
+Gather data that should be the same address and calculate the max diagonal
+distance for each set of "duplicates" (we ignore apartment/building numbers,
+so expect duplicates)
+
+For distances that seem unreasonable, intersect the lat/long with the zipcode
+polygons and look for bad ones.
+
+If I can, correct the zipcode. If I can't, flag the point as hopeless. 
+
+```{r more zip}
+df_nodups <- 
+dfnew %>% #head(20000) %>% 
+  group_by(ZIPCODE, Street_name, Street_num, Street_type, Prefix) %>% 
+  summarise(n=n(),
+            Street_num=last(Street_num),
+            Prefix=last(Prefix),
+            Street_name=last(Street_name),
+            Street_type=last(Street_type),
+            ZIPCODE=tail(names(sort(table(ZIPCODE))),1),
+            Lat=mean(Y),
+            Lon=mean(X),
+            Xmax=(max(X_COORD)-min(X_COORD)),
+            Ymax=(max(Y_COORD)-min(Y_COORD)),
+            Diagonal=sqrt(Xmax**2 + Ymax**2),
+            Xstd=sd(X_COORD),
+            Ystd=sd(Y_COORD),
+            X=mean(X_COORD),
+            Y=mean(Y_COORD)
+            ) %>% 
+  select(Street_num, Prefix, Street_name, Street_type, ZIPCODE,
+         n, Diagonal, Xmax, Ymax, Xstd, Ystd, X, Y, Lat, Lon) %>% 
+  filter(n>1)
+
+#   Now let's intersect the df_nodups file, where the diagonal distance >500 ft
+#   with the zipcode polygons. I don't know which polygon file CoH uses, so I
+#   will use a recent one (2019) from the state.
+
+#   All texas zips
+
+temp <- readRDS(file = "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Zipcodes/COH_Zip_Polys.rds")
+
+temp <- temp %>% rename(Zip=ZIP_CODE) %>% 
+  mutate(Zip=as.character(Zip))
+
+# Prep coordinate file
+
+#   First pull out appropriate records from df_nodups
+
+tmp <- df_nodups %>% filter(Diagonal>500) %>% # let's start with the worst ones
+  select(Street_num, Prefix, Street_name, Street_type, ZIPCODE, Diagonal, n) %>% 
+  inner_join(dfnew,by=c("Street_num", "Prefix", "Street_name", 
+                        "Street_type", "ZIPCODE"))
+
+googlecrs <- 4326
+dat <- data.frame(Longitude=tmp$X, Latitude=tmp$Y, stringsAsFactors = FALSE)
+
+dat <- sf::st_as_sf(dat, coords=c("Longitude", "Latitude"), crs=googlecrs, agr = "identity")
+
+sf::sf_use_s2(FALSE)
+
+#   find points in polygons
+#   since zipcodes don't overlap, let's just grab the array index
+#   instead of creating a huge matrix
+a <- sf::st_intersects(dat, temp, sparse = TRUE)
+
+#   Append the zipcode field to the data frame
+tmp$Zip <- temp$Zip[unlist(a)]
+
+#   Look for Zip != Zipcode
+
+#   This represents all duplicate addresses that contain 2 or more zipcodes
+eraseme <- 
+tmp %>% mutate(Diagonal=as.character(Diagonal)) %>% 
+  group_by(Diagonal) %>% 
+    mutate(numzips=length(unique(Zip))) %>% 
+  ungroup() %>% 
+  filter(numzips>1) %>% # This gets rid of apartments and the like
+  mutate(Diagonal=as.numeric(Diagonal))
+
+#   Check bad zipcodes. Either they make no sense, or they might. Test by looking
+#   nearby for the street name
+
+#   More apartment insurance
+Bad_zips <- eraseme %>% filter(ZIPCODE!=Zip, n<10)
+
+#   Make an sf object
+Baddat <- sf::st_as_sf(Bad_zips, coords=c("X", "Y"), crs=googlecrs, agr = "identity")
+Bad_zips$hits <- 0 # How many addresses with same street name live in new zip?
+Bad_zips$closeness <- 0  # how close am I to the right zipcode?
+for (i in 1:nrow(Bad_zips)){
+  print(paste("---", i, "---", Bad_zips[i,]$Street_name))
+  Bad_zips[i,]$hits <- 
+    sum(str_detect(dfnew$ZIPCODE,Bad_zips[i,]$Zip) & 
+        str_detect(dfnew$Street_name,Bad_zips[i,]$Street_name)
+  )
+#   How close to bad zipcode is the point? Boundary of zip may have moved.
+  Bad_zips[i,]$closeness <- as.numeric(sf::st_distance(Baddat[i,], 
+                            temp[str_detect(temp$Zip,Bad_zips[i,]$ZIPCODE),]))
+}
+
+#   For closeness of < 250 feet, leave the record alone.
+
+Bad_zips <- Bad_zips %>% 
+  filter(closeness>250)
+
+#   for hits < 3, delete the record
+
+ObjID <- Bad_zips[Bad_zips$hits<3,]$OBJECTID
+
+foo <-  df[df$OBJECTID %in% ObjID,] %>% 
+  mutate(change="Location mismatches Zipcode so badly point discarded") 
+corrections <- bind_rows(corrections, foo)
+
+#   Delete record
+for (i in 1:nrow(Bad_zips)){
+  if (Bad_zips[i,]$hits<3) {
+    dfnew <- dfnew[dfnew$OBJECTID!=Bad_zips[i,]$OBJECTID,]
+  }
+}
+  
+#   for hits >=2, correct the zipcode
+ObjID <- Bad_zips[Bad_zips$hits>=3,]$OBJECTID
+
+foo <-  df[df$OBJECTID %in% ObjID,] %>% 
+  mutate(change=paste("Location mismatches Zipcode, correct it to", 
+                       Bad_zips[Bad_zips$OBJECTID %in% ObjID,]$Zip)) 
+
+foo2 <- Bad_zips[Bad_zips$OBJECTID %in% ObjID,] %>% 
+  select(OBJECTID, Zip)
+foo <- left_join(df[df$OBJECTID %in% ObjID,],
+                 foo2,
+                 by="OBJECTID") %>% 
+  mutate(change=paste("Location mismatches Zipcode, correct it to", Zip )) %>% 
+  select(-Zip)
+
+corrections <- bind_rows(corrections, foo)
+
+Bad_zips <- Bad_zips %>% filter(hits>=3)
+for (i in 1:nrow(Bad_zips)){
+    dfnew[dfnew$OBJECTID==Bad_zips[i,]$OBJECTID,]$ZIPCODE <- Bad_zips[i,]$Zip 
+}
+
+#     Let's look at dups again
+
+df_nodups <- 
+dfnew %>% #head(20000) %>% 
+  group_by(ZIPCODE, Street_name, Street_num, Street_type, Prefix) %>% 
+  summarise(n=n(),
+            Street_num=last(Street_num),
+            Prefix=last(Prefix),
+            Street_name=last(Street_name),
+            Street_type=last(Street_type),
+            ZIPCODE=tail(names(sort(table(ZIPCODE))),1),
+            Lat=mean(Y),
+            Lon=mean(X),
+            Xmax=(max(X_COORD)-min(X_COORD)),
+            Ymax=(max(Y_COORD)-min(Y_COORD)),
+            Diagonal=sqrt(Xmax**2 + Ymax**2),
+            Xstd=sd(X_COORD),
+            Ystd=sd(Y_COORD),
+            X=mean(X_COORD),
+            Y=mean(Y_COORD)
+            ) %>% 
+  select(Street_num, Prefix, Street_name, Street_type, ZIPCODE,
+         n, Diagonal, Xmax, Ymax, Xstd, Ystd, X, Y, Lat, Lon) %>% 
+  filter(n>1)
+
+#   Still needs work, but fixing more prefixes should help.
+#   Safety save
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_5"))
+saveRDS(corrections, paste0(path, "corrections_5.Rds"))
+
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_5"))
+corrections <- readRDS(paste0(path, "corrections_5.Rds"))
+
+```
+
+```{r more prefixes}
+
+dfnew <- dfnew %>% 
+  mutate(Zipcode=ZIPCODE)  
+  
+df_prefix <- dfnew %>% 
+  group_by(Zipcode, Street_name, Street_type) %>% 
+    summarize(n=n(),
+              sumNA = sum(Prefix==""),
+              sumE = sum(Prefix=="E", na.rm=TRUE),
+              sumW = sum(Prefix=="W", na.rm=TRUE),
+              sumN = sum(Prefix=="N", na.rm=TRUE),
+              sumS = sum(Prefix=="S", na.rm=TRUE)) %>%
+    filter(sumNA<n) %>% # These are okay so drop them 
+    filter(n>5) %>% # Too little information
+    filter(n>5*sumNA) # Need plenty of good data
+
+#   Do some exploration
+
+bad_pts <- 
+df_prefix %>% filter(sumNA>0) #%>%  arrange(-n) %>%  head(10)
+#   Subset dfnew based on these guys
+df_bad <- inner_join(dfnew, bad_pts, 
+                     by=c("Zipcode", "Street_name", "Street_type"))
+
+Save_stats <- NULL
+df_worse <- df_bad[df_bad$Prefix=="",]
+####df_worse <- df_worse %>% filter(Street_name=="PEACEFUL CANYON")
+for (i in 1:nrow(df_worse)){
+  pt <- df_worse[i,]
+  print(paste("----", pt$Street_num, pt$Street_name, pt$Street_type))
+  eraseme <-  df_bad %>% 
+    filter(Street_name==pt$Street_name,
+           Street_type==pt$Street_type) %>% 
+    mutate(eucdist=sqrt((X_COORD - pt$X_COORD)^2 +
+                          (Y_COORD - pt$Y_COORD)^2)) %>% 
+    filter(eucdist <300,
+           !Prefix=="") %>% 
+  #   How many candidates do I get within 300 feet?
+    group_by(Prefix) %>%
+      summarize(num_pts=n(),
+                n=last(n),
+              sumE = sum(Prefix=="E"),
+              sumW = sum(Prefix=="W"),
+              sumN = sum(Prefix=="N"),
+              sumS = sum(Prefix=="S"),
+              Street_name=last(Street_name)
+                ) %>%
+    mutate(OBJECTID=pt$OBJECTID, 
+           Street_num=pt$Street_num)
+ #  If there is more than one prefix in the vicinity, don't do anything
+  if (nrow(eraseme)==1){
+    Save_stats <- rbind(Save_stats, eraseme)
+  }
+}
+
+#     Correct spots that have 5 or more neighbors within 300 feet that all have
+#     the same Prefix
+
+Save_stats <- Save_stats %>% 
+  filter(num_pts >= 5) %>% 
+  select(OBJECTID, Prefix_new=Prefix)
+
+#   Update corrections and dfnew
+
+ObjID <- Save_stats$OBJECTID
+foo <- left_join(df[df$OBJECTID %in% ObjID,],
+                 Save_stats,
+                 by="OBJECTID") %>% 
+  mutate(change=paste("Missing Prefix updated based on nearby points to",
+                      Prefix_new )) %>% 
+  select(-Prefix_new)
+
+corrections <- bind_rows(corrections, foo)
+
+dfnew[dfnew$OBJECTID %in% ObjID,]$Prefix <- Save_stats$Prefix_new
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_6"))
+saveRDS(corrections, paste0(path, "corrections_6.Rds"))
+##-----------------------------   stop here
+
+#   Let's take another swipe at it
+
+df_prefix <- dfnew %>% 
+  group_by(Zipcode, Street_name, Street_type) %>% 
+    summarize(n=n(),
+              sumNA = sum(Prefix==""),
+              sumE = sum(Prefix=="E", na.rm=TRUE),
+              sumW = sum(Prefix=="W", na.rm=TRUE),
+              sumN = sum(Prefix=="N", na.rm=TRUE),
+              sumS = sum(Prefix=="S", na.rm=TRUE)) %>%
+    filter(sumNA<n) %>% # These are okay so drop them 
+    filter(n>5) %>% # Too little information
+    filter(n>5*sumNA) # Need plenty of good data
+
+#   Do some exploration
+
+bad_pts <- 
+df_prefix %>% filter(sumNA>0) #%>%  arrange(-n) %>%  head(10)
+#   Subset dfnew based on these guys
+df_bad <- inner_join(dfnew, bad_pts, 
+                     by=c("Zipcode", "Street_name", "Street_type"))
+
+Save_stats <- NULL
+df_worse <- df_bad[df_bad$Prefix=="",]
+####df_worse <- df_worse %>% filter(Street_name=="PEACEFUL CANYON")
+for (i in 1:nrow(df_worse)){
+  pt <- df_worse[i,]
+  print(paste("----", pt$Street_num, pt$Street_name, pt$Street_type))
+  eraseme <-  df_bad %>% 
+    filter(Street_name==pt$Street_name,
+           Street_type==pt$Street_type) %>% 
+    mutate(eucdist=sqrt((X_COORD - pt$X_COORD)^2 +
+                          (Y_COORD - pt$Y_COORD)^2)) %>% 
+    filter(eucdist <500,
+           !Prefix=="") %>% 
+  #   How many candidates do I get within 500 feet?
+    group_by(Prefix) %>%
+      summarize(num_pts=n(),
+                n=last(n),
+              sumE = sum(Prefix=="E"),
+              sumW = sum(Prefix=="W"),
+              sumN = sum(Prefix=="N"),
+              sumS = sum(Prefix=="S"),
+              Street_name=last(Street_name)
+                ) %>%
+    mutate(OBJECTID=pt$OBJECTID, 
+           Street_num=pt$Street_num)
+ #  If there is more than one prefix in the vicinity, don't do anything
+  if (nrow(eraseme)==1){
+    Save_stats <- rbind(Save_stats, eraseme)
+  }
+}
+
+#     Correct spots that have 10 or more neighbors within 500 feet that all have
+#     the same Prefix
+
+Save_stats <- Save_stats %>% 
+  filter(num_pts >= 10) %>% 
+  select(OBJECTID, Prefix_new=Prefix)
+  
+#   Update corrections and dfnew
+
+ObjID <- Save_stats$OBJECTID
+foo <- left_join(df[df$OBJECTID %in% ObjID,],
+                 Save_stats,
+                 by="OBJECTID") %>% 
+  mutate(change=paste("Missing Prefix updated based on 10/500 nearby points to",
+                      Prefix_new )) %>% 
+  select(-Prefix_new)
+
+corrections <- bind_rows(corrections, foo)
+
+dfnew[dfnew$OBJECTID %in% ObjID,]$Prefix <- Save_stats$Prefix_new
+
+saveRDS(dfnew, paste0(path, "temporary_intermediate_file_7"))
+saveRDS(corrections, paste0(path, "corrections_7.Rds"))
+
+#####Save_stats[duplicated(Save_stats$OBJECTID),]
+
+```
+
+##   Fix some specific errors manually
+
+```{r manual}
+
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_7"))
+corrections <- readRDS(paste0(path, "corrections_7.Rds"))
+
+eraseme <- dfnew %>% 
+  mutate(pseudotype=str_extract(Street_name, "\\w+$")) %>% 
+  filter(pseudotype==Street_type) %>% 
+  group_by(Street_name) %>% 
+    summarize(Street_type=last(Street_type),
+              n=n())
+#   Martin Luther King consistently missing Jr at end
+#   Baron Brook Dr Dr not sensible, etc
+
+Old_street <- c("MARTIN LUTHER KING$", "BARON BROOK DR", "BROKEN BACK DR STE",
+                "COLBURN DR N", "SAGEBROOK DR", "LINBROOK DRIVE", 
+                "HAYBROOK DRIVE", "SANOUR DR", "FAIRWAY DR STE",
+                "SHERWOOD RIDGE DRIVE", "BRITTMOORE PARK DRIV", 
+                "CANDLELIGHT PLACE DR", "STEINHAGEN RD", "BLACK FALCON RD",
+                "NICHOLSON ST", "SINGLE OAK ST", "PALSTON BEND LN",
+                "SIENNA COVE LN", "LA PORTE FWY", "COMETS RUN",
+                "OAK RIDGE DRIVE", "BEMBRIDGE DRIVE", "PAXTON DRIVR",
+                "GILBERT SCOTT DR", "GREENS LANDING DR", 
+                "HAVEN CREEK DR/BACKS", "MAGIC FALLS DRIVE",
+                "BLUE BONNET DRIVE", "FALLBROOKD DR", "CYPRESS VALLEY DR",
+                "CLIFF PARK DRIVE", "WHITE OAK RIDGE DR", "IMPERIAL CREEK DRIVE",
+                "LAZY CREEK DR", "KILBURN RD", "FRY RD", "MITCHELL RD",
+                "BARKALOO RD STE", "SHERIDAN RD", "ROBERT RD ROBERT",
+                "MALCOLMSON RD", "PIN OAK RD", "MONDAY HARGR 0VE RD",
+                "SMITHFIELD CROSSING LN", "DA VINA LN", "SCROGGINS LN",
+                "1510TH BEVIS ST", "PECAN ST STE", "LEADER ST", "SAGECIRCLE ST 1",
+                "CENTRAL AVE", "FRANK SCOTT BLVD", "ALCEA CT", "CLIFF MARSHAL ST",
+                "COUNTRY VILLAGE BLVD", "CREEK CIR", "FRANK SCOTT BLVD",
+                "HOBBY AIRPORT LOOP", "MOSSY OAK DR", "MOUNTAIN MAPLE CT",
+                "OLD MAIN LOOP", "PETINA CYPRESS CT")
+
+New_street <- c("MARTIN LUTHER KING JR", "BARON BROOK", "BROKEN BACK",
+                "COLBURN", "SAGEBROOK", "LINBROOK",
+                "HAYBROOK", "SANOUR", "FAIRWAY",
+                "SHERWOOD RIDGE", "BRITTMOORE PARK",
+                "CANDLELIGHT PLACE", "STEINHAGEN", "BLACK FALCON",
+                "NICHOLSON", "SINGLE OAK", "PALSTON BEND",
+                "SIENNA COVE", "LA PORTE", "COMETS",
+                "OAK RIDGE", "BEMBRIDGE", "PAXTON",
+                "GILBERT SCOTT", "GREENS LANDING",
+                "HAVEN CREEK", "MAGIC FALLS",
+                "BLUE BONNET", "FALLBROOK", "CYPRESS VALLEY",
+                "CLIFF PARK", "WHITE OAK RIDGE", "IMPERIAL CREEK",
+                "LAZY CREEK", "KILBURN", "FRY", "MITCHELL",
+                "BARKALOO", "SHERIDAN", "ROBERT",
+                "MALCOLMSON", "PIN OAK", "MONDAY HARGROVE", 
+                "SMITHFIELD CROSSING", "DA VINA", "SCROGGINS",
+                "BEVIS", "PECAN", "LEADER", "SAGECIRCLE",
+                "CENTRAL", "FRANK SCOTT", "ALCEA", "CLIFF MARSHAL",
+                "COUNTRY VILLAGE", "CREEK", "FRANK SCOTT",
+                "HOBBY AIRPORT", "MOSSY OAK", "MOUNTAIN MAPLE",
+                "OLD MAIN", "PETINA CYPRESS")
+
+#  First repair type where needed
+
+dfnew[str_detect(dfnew$Street_name, "FAIRWAY DR STE"),]$Street_type <- "DR"
+dfnew[str_detect(dfnew$Street_name, "PAXTON DRIVR"),]$Street_type <- "DR"
+dfnew[str_detect(dfnew$Street_name, "HAVEN CREEK DR/BACKS"),]$Street_type <- "DR"
+dfnew[str_detect(dfnew$Street_name, "BLACK FALCON RD"),]$Street_type <- "RD"
+dfnew[str_detect(dfnew$Street_name, "LA PORTE FWY"),]$Street_type <- "FWY"
+dfnew[str_detect(dfnew$Street_name, "FRANK SCOTT BLVD"),]$Street_type <- "BLVD"
+
+#   Now repair names
+
+for (i in 1:length(Old_street)) {
+  dfnew[str_detect(dfnew$Street_name,Old_street[i]),]$Street_name <- New_street[i]
+}
+
+ObjID <- dfnew %>% filter(str_detect(STREET_NAME, 
+                                  paste(Old_street, collapse="|")))  
+
+foobar <-  df[df$OBJECTID %in% ObjID$OBJECTID,] %>% 
+  mutate(change=paste("Corrected street name to", 
+                       dfnew[dfnew$OBJECTID %in% ObjID$OBJECTID,]$Street_name)) 
+corrections <- bind_rows(corrections, foobar)
+saveRDS(corrections, paste0(path, "Final_corrections.Rds"))
+
+```
+
+
+```{r averaging}
+#   Complete file after cleanup
+saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
+
+########   rebuild dfnew from scratch. Now it only needs to drive the 
+########   averaging process. Update dfnew accordingly and there will be no 
+########   duplicates left
+
+dfnew <- 
+dfnew %>% 
+  group_by(Zipcode, Street_name, Street_num, Street_type, Prefix) %>% 
+  summarise(n=n(),
+            Street_num=last(Street_num),
+            Prefix=last(Prefix),
+            Street_name=last(Street_name),
+            Street_type=last(Street_type),
+            City=last(CITY),
+            Zipcode=last(Zipcode),
+            Lat=mean(Y),
+            Lon=mean(X),
+            Xstd=sd(X_COORD),
+            Ystd=sd(Y_COORD),
+            X_COORD=mean(X_COORD),
+            Y_COORD=mean(Y_COORD),
+            OBJECTID=last(OBJECTID)
+            ) %>% 
+  select(Street_num, Prefix, Street_name, Street_type, City, Zipcode,
+         n, Lat, Lon, Xstd, Ystd, X=X_COORD, Y=Y_COORD, OBJECTID)  
+
+
+#   File suitable for using in geocoding
+
+saveRDS(dfnew, paste0(path, "COH_Geocoding_Locations.rds"))
+
+dt <- data.table::as.data.table(dfnew)
+saveRDS(dt,paste0(path, "COH_Geocoding_Locations_table.rds"))
+
+```
