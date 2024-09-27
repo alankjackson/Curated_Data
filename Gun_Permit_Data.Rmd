@@ -3,12 +3,23 @@ title: "Gun Permit Data"
 author: "Alan Jackson"
 date: "7/3/2021"
 output: html_document
+description: "Painfully building a dataset of firearm permits in Texas up to 2020"
+image: "cover.png"
+categories:
+  - Data
+  - Texas
+  - Firearms
+execute:
+  freeze: auto  # re-render only when source changes
+  warning: false
+editor: source
 ---
 
 ```{r setup, include=FALSE}
 library(tidyverse)
-library(tabulizer)
-library(textreadr)
+# library(tabulizer)
+library(tabulapdf)
+# library(textreadr)
 
 output_folder <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Gun_Permits/"
 
@@ -138,7 +149,7 @@ final[final$County=="Dewitt",]$County <- "DeWitt"  # yeah, why do they spell it 
 
 #     Save to a file
 
-saveRDS(final, paste0(output_folder, "Licenses_by_County_2017to2020.rds"))
+# saveRDS(final, paste0(output_folder, "Licenses_by_County_2017to2020.rds"))
 
 
 ```
@@ -237,7 +248,7 @@ finalzip <- finalzip %>%
 
 #     Save to a file
 
-saveRDS(finalzip, paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
+# saveRDS(finalzip, paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
 
 ```
 
@@ -277,7 +288,7 @@ Old_county[Old_county$County=="Dewitt",]$County <- "DeWitt"  # yeah, why do they
 
 All_county <- bind_rows(Old_county, New_county)
 
-saveRDS(All_county, paste0(output_folder, "Licenses_by_County_1997to2020.rds"))
+# saveRDS(All_county, paste0(output_folder, "Licenses_by_County_1997to2020.rds"))
 
 ####     Zip data
 
@@ -286,7 +297,7 @@ New_zip <- readRDS(paste0(output_folder, "Licenses_by_Zip_2017to2020.rds"))
 
 All_zip <- bind_rows(Old_zip, New_zip)
 
-saveRDS(All_zip, paste0(output_folder, "Licenses_by_Zip_1997to2020.rds"))
+# saveRDS(All_zip, paste0(output_folder, "Licenses_by_Zip_1997to2020.rds"))
 
 ```
 
