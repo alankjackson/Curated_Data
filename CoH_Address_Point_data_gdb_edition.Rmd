@@ -31,7 +31,9 @@ library(tidyverse)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/CoH_Address_Points/"
 
-googlecrs <- 4326
+googlecrs <- "EPSG:4326"
+COH_crs <- "EPSG:2278"
+
 filename <- "SITEADDRESSES_20240808.gdb"
 
 layers <- sf::st_layers(paste0(path, filename))
@@ -40,6 +42,18 @@ df <- sf::st_read(paste0(path, filename),
                     layer = "SiteAddresses")
 
 corrections <- NULL # collect what has been changed
+
+
+#   Some fields are all NA. I'll go ahead and remove those now
+#     unitrange to and from have only about 20 non-NA values. Also
+#     altunitid has 3 non NA's
+#   Validationstatus is always = 2
+
+df <- df %>% 
+  select(-esn, -propertytaxid, -unitrangeto, -unitrangefrom, -altunitid,
+         -altunittype, -secondaltunitid, -secondaltunittype, -addrrange,
+         -pointtype, -openlocation, -capturemeth, -msag, -VALIDATIONSTATUS)
+
 ```
 
 ## Quality control and Explore
@@ -51,82 +65,130 @@ Let's explore each column, with an eye towards possibly transforming
 them to a better data type (dates should be dates, for example)
 
 ```{r QC and Explore}
+
 # Longitude
 
-df %>% select(X) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(xcoord) %>% 
   ggplot() +
-  geom_histogram(aes(x=X))
+  geom_histogram(aes(x=xcoord))
 
 # Latitude
 
-df %>% select(Y) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(ycoord) %>% 
   ggplot() +
-  geom_histogram(aes(x=Y))
+  geom_histogram(aes(x=ycoord))
 
-# Objectid
+# siteaddid
 
 #   Can I safely convert to numeric?
 
-df %>% select(OBJECTID) %>% 
-  mutate(Objectid = as.integer(OBJECTID)) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  mutate(siteaddid = as.integer(siteaddid)) %>% 
   ggplot() +
-  geom_histogram(aes(x=Objectid))
+  geom_histogram(aes(x=siteaddid))
 
-df %>% select(OBJECTID) %>% 
-  mutate(Objectid = as.integer(OBJECTID)) %>% 
-  unique() %>% 
-  count()
-  
-# ID (same question)
+#   Is siteaddid a unique key? (spoiler alert - yes)
 
-df %>% select(ID) %>% 
-  mutate(Id = as.integer(ID)) %>% 
-  ggplot() +
-  geom_histogram(aes(x=Id))
-
-df %>% select(ID) %>% 
-  mutate(Objectid = as.integer(ID)) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  mutate(siteaddid = as.integer(siteaddid)) %>% 
   unique() %>% 
   count()
 
-# ADDR_ID (same question)
+#   Is siteaddid_old a unique key? (spoiler alert - yes)
 
-df %>% select(ADDR_ID) %>% 
-  mutate(Addr_id = as.integer(ADDR_ID)) %>% 
-  ggplot() +
-  geom_histogram(aes(x=Addr_id))
-
-df %>% select(ADDR_ID) %>% 
-  mutate(Objectid = as.integer(ADDR_ID)) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(siteaddid_old) %>% 
+  mutate(siteaddid_old = as.integer(siteaddid_old)) %>% 
   unique() %>% 
   count()
 
-# TYPES
+# ADDR_ID (unique? Nope)
 
-df %>% select(TYPES) %>% 
-  filter(!is.na(TYPES)) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(addressptid) %>% 
+  mutate(addressptid = as.integer(addressptid)) %>% 
   ggplot() +
-  geom_histogram(aes(x=TYPES), stat="count") +
+  geom_histogram(aes(x=addressptid))
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(addressptid) %>% 
+  mutate(addressptid = as.integer(addressptid)) %>% 
+  unique() %>% 
+  count()
+
+# v911 (0, 1, or NA)
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(v911) %>% 
+  mutate(v911 = as.integer(v911)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=v911))
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(v911) %>% 
+  mutate(v911 = as.integer(v911)) %>% 
+  unique() %>% 
+  count()
+
+# addrtype
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(addrtype) %>% 
+  filter(!is.na(addrtype)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=addrtype), stat="count") +
+  coord_flip()
+
+# source
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(source) %>% 
+  filter(!is.na(source)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=source), stat="count") +
   coord_flip()
 
 # STATUS
 
-df %>% select(STATUS) %>% 
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(status) %>% 
   ggplot() +
-  geom_histogram(aes(x=STATUS), stat="count") +
+  geom_histogram(aes(x=status), stat="count") +
   coord_flip()
+
+# municipality
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(municipality) %>% 
+  ggplot() +
+  geom_histogram(aes(x=municipality), stat="count") +
+  coord_flip()
+
 ```
+
+Most fields seem well-behaved. However, "addrtype" looks like it contains old
+database data as well as new database data, and will need cleanup. For example,
+ABD is almost certainly the same as "Abandon".
+
+Similarly, there are clearly similar issues with "source", which will need 
+some cleanup.
+
 
 Lat longs, and all the ID fields seem well enough behaved. Not sure
 about TYPES, it seems to be left blank most of the time, so its
 usefulness is questionable.
 
-Status is curious. It is always filled in, and some of the meaning seem
-obvious. ABD is obviously abandoned. CNTY = county, COH = City of
-Houston. I think CP means that the location was reported? by Center
-Point? I don't know what the rest mean. Not really a clue. Except that
-UTA may have something to do with utilities.
-
+Status is curious. It is always filled in, and some of the meaning seem obvious.
+CNTY = county, COH = City of Houston. 
+CP are weird. Some are parking meters, fire hydrants, utility boxes. etc.
+UTA also seem to be utilities - cell tower, bus stop, electric pole,
+parking meter, etc.
+OOR means "Out Of Range". Which I think means that the addresses are not
+monotonic, but jump around - which is bad. I will have to keep those but use
+the flag to not use them to interpolate.
+#####################   stopped here #######################
 ```{r QC and Explore more}
 
 # STREET_NUM
