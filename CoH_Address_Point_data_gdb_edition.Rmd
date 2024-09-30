@@ -175,10 +175,7 @@ ABD is almost certainly the same as "Abandon".
 Similarly, there are clearly similar issues with "source", which will need 
 some cleanup.
 
-
-Lat longs, and all the ID fields seem well enough behaved. Not sure
-about TYPES, it seems to be left blank most of the time, so its
-usefulness is questionable.
+Lat longs, and all the ID fields seem well enough behaved. 
 
 Status is curious. It is always filled in, and some of the meaning seem obvious.
 CNTY = county, COH = City of Houston. 
@@ -188,6 +185,45 @@ parking meter, etc.
 OOR means "Out Of Range". Which I think means that the addresses are not
 monotonic, but jump around - which is bad. I will have to keep those but use
 the flag to not use them to interpolate.
+
+##        Do some cleanup
+
+```{r first cleanup}
+
+#   source field redundancies
+
+df <- df %>% 
+  mutate(source=str_replace(source, "MONT", "Montgomery 911")) %>% 
+  mutate(source=str_replace(source, "RVSG", "Reverse Geocode")) %>% 
+  mutate(source=str_replace(source, "GHC911", "Greater Harris County 911")) %>% 
+  mutate(source=str_replace(source, "CP", "Center Point")) %>% 
+  mutate(source=str_replace(source, "CE", "Code Enforcement")) %>% 
+  mutate(source=str_replace(source, "COH", "City of Houston")) %>% 
+  mutate(source=str_replace(source, "HARRIS", "Harris Central Appraisal District"))  
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(source) %>% 
+  filter(!is.na(source)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=source), stat="count") +
+  coord_flip()
+
+#   addrtype redundancies
+
+df <- df %>% 
+  mutate(addrtype=str_replace(addrtype, "VAC", "Vacant")) %>% 
+  mutate(addrtype=str_replace(addrtype, "UNK", "Unknown")) %>% 
+  mutate(addrtype=str_replace(addrtype, "RESERVE", "Reserve")) %>% 
+  mutate(addrtype=str_replace(addrtype, "PARCEL", "Parcel")) %>% 
+  mutate(addrtype=str_replace(addrtype, "NonStr", "Non Structural")) %>% 
+  mutate(addrtype=str_replace(addrtype, "INDUSTRY", "Industry")) %>% 
+  mutate(addrtype=str_replace(addrtype, "COMMERCIAL", "Commercial")) %>% 
+  mutate(addrtype=str_replace(addrtype, "ABD", "Abandon")) %>% 
+  mutate(addrtype=str_replace(addrtype, "PubPark", "Public Park")) %>% 
+  mutate(addrtype=str_replace(addrtype, "RES", "Residential")) %>% 
+
+```
+
 #####################   stopped here #######################
 ```{r QC and Explore more}
 
