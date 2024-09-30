@@ -251,8 +251,8 @@ dfnew <- df %>%
   mutate(addrnum = str_remove(addrnum, "^0"))  
 
 corrections <- df %>% 
-  filter(str_detect(addrnum, "^[1-2]+/+[1-9]+") |
-         str_detect(addrnum, "[^0-9A-Z#/\\s]")) %>%  
+  filter(str_detect(addrnum, "^ ") |
+         str_detect(addrnum, "^0")) %>%  
   mutate(change="Extraneous stuff in addrnum")
 
 #   Drop weird, bogus addresses (99999 OLD KATY RD, 99999 OFF CARSON, 
@@ -279,26 +279,102 @@ dfnew <- dfnew %>%
   mutate(fraction = replace(fraction, which(
                             str_detect(fraction, "^1/1$|^\\s*$")), NA))
 
-#####################   stopped here #######################
-tmp <-   dfnew %>% 
-  mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
-  filter(Street_num>49999) %>% 
-  mutate(change="STREET_NUM > 49999, which fails in spot checks") %>% 
-  select(-Street_num, -Street_alpha)
+tmp <-   df %>% 
+  filter((siteaddid == 309237) |
+         (siteaddid == 468637) |
+         (siteaddid == 1184918)) %>% 
+  mutate(change="Bogus addresses")  
 
 corrections <- bind_rows(corrections, tmp)
 
+#####################   stopped here #######################
+
+#   Let's look at addresses larger than 50,000. Are all of these problematic?
+
+tmp <- df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  mutate(addrnum=as.integer(addrnum)) %>% 
+  filter(addrnum>50000)  
+
+#   These need corrections, the rest, delete.
+From_to <- tribble(~fromaddrnum, ~fromstreet, ~toaddrnum,
+"144407", "BROWNSVILLE ST", "14407",
+"187472", "COMANCHE DR", "18472",
+"68260", "SATSUMA", "6826",
+"61200", "CENTER", "612",
+"56120", "CHAUCER", "5612",
+"96615", "STAG LN", "26615",
+"191116", "SUFFOLK", "19116",
+"83202", "TERRA VALLEY LN", "8302",
+"80300", "INDIANA", "803",
+"93077", "SUMMERBELL LN", "9307",
+"296937", "LEGENDS GREEN DR", "29637",
+"191232", "RYE CT", "19132",
+"71201", "KANSAS", "712",
+"63010", "DE PRIEST ST", "6310",
+"165018", "AVENPLACE RD", "16518",
+"79075", "WOODWAY DR", "7905",
+"183151", "KUYKENDAHL RD", "18315",
+"105415", "S SUNRISE SHORES LN", "10415",
+"246219", "BALLARD DR", "24621",
+"167007", "MULBEN CT", "17007",
+"168006", "HIGHLAND COUNTRY DR", "16806",
+"102115", "DAWSON HILL LN", "10215",
+"153155", "HOLLOWAY HILLS TRL", "15315",
+"82011", "HAWTHORNE VALLEY LN", "8211",
+"188057", "BRESCIA LN", "18807",
+"189011", "BRESCIA LN", "19011",
+"114510", "JONSTONE PAISLEY CT", "11510",
+"220122", "GRAND MIST DR", "22022",
+"72314", "CYPRESS SHUMARD OAK DR", "7314",
+"243327", "MARCELLO LAKES DR", "24327",
+"153042", "ROSEHILL SUMMIT LN", "15302",
+"248179", "PUCCINI PL", "24819",
+"61002", "HACKBERRY BRANCH LN", "6102",
+"115114", "KIRKSHAW DR", "11514",
+"61606", "BLUE SAPPHIRE CT", "21606",
+"54311", "ALTO GARDEN DR", "24311",
+"50274", "BROOM ST", "5024",
+"226938", "DRYBANK CREEK LN", "26938",
+"113131", "HILLSIDE KNOLL LN", "11313",
+"199252", "PURUS DR", "19252",
+"2525718", "ROYAL CATCHFLY RD", "25718",
+"197702", "HICKORY HEIGHTS DR", "19702"
+) %>%
+  mutate(fulladdr=paste(fromaddrnum, fromstreet))
+
 dfnew <- dfnew %>% 
-  mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
-  filter(Street_num<49999)  
+  left_join(., From_to, by="fulladdr") %>% 
+  mutate(addrnum=if_else(is.na(toaddrnum), addrnum, toaddrnum)) %>% 
+  select(-fromaddrnum, -fromstreet, -toaddrnum)
 
-dfnew %>% 
-  ggplot() +
-  geom_histogram(aes(x=Street_num)) 
+tmp <- df %>% 
+  left_join(., From_to, by="fulladdr") %>% 
+  filter(! is.na(toaddrnum)) %>% 
+  mutate(addrnum=toaddrnum) %>% 
+  select(-fromaddrnum, -fromstreet, -toaddrnum) %>% 
+  mutate(change="Repair bad addresses")  
+
+corrections <- bind_rows(corrections, tmp)
+
+#   Drop some hopeless addresses
+
+tmp <- dfnew %>% 
+  mutate(addrtest=as.integer(addrnum)) %>% 
+  filter(addrtest>=50000) %>% 
+  select(-addrtest) %>% 
+  mutate(change="delete records with irrepairable or duplicate addresses")  
+
+corrections <- bind_rows(corrections, tmp)
   
-
+dfnew <- dfnew %>% 
+  mutate(addrtest=as.integer(addrnum)) %>% 
+  filter(addrtest<50000) %>% 
+  select(-addrtest)
+  
 ```
 
+
+#####################   stopped here #######################
 ### STREET_NUM
 
 Now it gets messy.
