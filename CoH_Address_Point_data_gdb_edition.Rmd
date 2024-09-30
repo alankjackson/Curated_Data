@@ -220,37 +220,66 @@ df <- df %>%
   mutate(addrtype=str_replace(addrtype, "COMMERCIAL", "Commercial")) %>% 
   mutate(addrtype=str_replace(addrtype, "ABD", "Abandon")) %>% 
   mutate(addrtype=str_replace(addrtype, "PubPark", "Public Park")) %>% 
-  mutate(addrtype=str_replace(addrtype, "RES", "Residential")) %>% 
+  mutate(addrtype=str_replace(addrtype, "RES", "Residential")) 
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(addrtype) %>% 
+  filter(!is.na(addrtype)) %>% 
+  ggplot() +
+  geom_histogram(aes(x=addrtype), stat="count") +
+  coord_flip()
 
 ```
 
-#####################   stopped here #######################
 ```{r QC and Explore more}
 
-# STREET_NUM
+############
+# addrnum
+############
 
-df %>% select(STREET_NUM) %>% 
-  filter(str_starts(STREET_NUM, " ")) # test for beginning blank
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(addrnum) %>% 
+  filter(str_starts(addrnum, " ")) # test for beginning blank
 
-df %>% select(STREET_NUM) %>% 
-  filter(str_detect(STREET_NUM, " [0-9]")) # test for blank then number
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(addrnum) %>% 
+  filter(str_detect(addrnum, " [0-9]")) # test for blank then number
   
+    #   remove beginning blanks and beginning zeros
 dfnew <- df %>% 
-  mutate(STREET_NUM = str_remove(STREET_NUM, "^[1-2]+/+[1-9]+")) %>% 
-  mutate(STREET_NUM = str_remove(STREET_NUM, "[^0-9A-Z#/\\s]")) %>% 
-  mutate(Street_alpha = str_trim(str_remove(STREET_NUM, "^\\d+")))  
+  mutate(addrnum = str_remove(addrnum, "^ ")) %>% 
+  mutate(addrnum = str_remove(addrnum, "^0"))  
 
 corrections <- df %>% 
-  filter(str_detect(STREET_NUM, "^[1-2]+/+[1-9]+") |
-         str_detect(STREET_NUM, "[^0-9A-Z#/\\s]")) %>%  
-  mutate(change="Extraneous stuff in STREET_NUM")
+  filter(str_detect(addrnum, "^[1-2]+/+[1-9]+") |
+         str_detect(addrnum, "[^0-9A-Z#/\\s]")) %>%  
+  mutate(change="Extraneous stuff in addrnum")
 
-dfnew %>% 
-  filter(Street_alpha!="") %>% 
+#   Drop weird, bogus addresses (99999 OLD KATY RD, 99999 OFF CARSON, 
+#   99999 OFF WEBERCREST)
+
+dfnew <- dfnew %>% 
+  filter(siteaddid!=309237) %>% 
+  filter(siteaddid!=468637) %>% 
+  filter(siteaddid!=1184918)  
+
+############
+# fraction
+############
+
+df %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  select(fraction) %>% 
+  filter(!is.na(fraction)) %>% 
   ggplot() +
-  geom_histogram(aes(x=Street_alpha), stat="count", na.rm=TRUE) +
-  coord_flip() 
-  
+  geom_histogram(aes(x=fraction), stat="count") 
+
+#   get rid of 1/1 fraction and convert blank to NA (which is faster)
+
+dfnew <- dfnew %>% 
+  mutate(fraction = replace(fraction, which(
+                            str_detect(fraction, "^1/1$|^\\s*$")), NA))
+
+#####################   stopped here #######################
 tmp <-   dfnew %>% 
   mutate(Street_num = as.numeric(str_extract(STREET_NUM,"^[0-9]+"))) %>% 
   filter(Street_num>49999) %>% 
