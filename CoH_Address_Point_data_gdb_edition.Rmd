@@ -967,10 +967,7 @@ saveRDS(corrections, paste0(path, "corrections_3.Rds"))
 
 ```{r City}
 
-#####################   stopped here #######################
-
-
-dfnew$CITY %>% unique() %>% sort()
+dfnew$municipality %>% unique() %>% sort()
 
 
 ```
@@ -981,11 +978,24 @@ City names look okay.
 
 dfnew$zipcode %>% unique() %>% sort()
 
+#   Oops, found a typo, correct 77704 to 77041
+
+ObjID <- dfnew %>% filter(str_detect(zipcode,"77704")) # who did we change?
+foo <-  df[df$siteaddid %in% ObjID$siteaddid,] %>% 
+  mutate(change="Corrected zipcode from 77704 to 77041") 
+corrections <- bind_rows(corrections, foo)
+
+dfnew <- dfnew %>% 
+  mutate(zipcode=str_replace(zipcode, "77704", "77041"))
+
 ```
 
-zipcodes look okay.
+zipcodes look okay, with one small exception.
 
 ```{r sources}
+
+
+#####################   stopped here #######################
 
 dfnew$SOURCES %>% unique() %>% sort()
 
