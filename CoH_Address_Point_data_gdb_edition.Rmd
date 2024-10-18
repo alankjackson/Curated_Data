@@ -994,85 +994,33 @@ zipcodes look okay, with one small exception.
 
 ```{r sources}
 
-
-#####################   stopped here #######################
-
-dfnew$SOURCES %>% unique() %>% sort()
+dfnew$source %>% unique() %>% sort()
 
 
 ```
 
-A little ambiguity between "COH" and "City of Houston", also CP and Centerpoint
-Energy, Center Point, and CE. And some other miscellaneous cleanup.
-```{r last edit date}
-
-dfnew %>% mutate(date=lubridate::ymd_hms(last_edited_date)) %>% 
-  ggplot() +
-  geom_histogram(aes(x=date))
-
-dfnew$addrnum <- as.character(dfnew$addrnum)
-dfnew <- dfnew %>% replace_na(list(prefix="", roadtype=""))
-dfnew <- dfnew %>% rename(Street_name=New_street)
-dfnew <- dfnew %>% mutate(CITY=str_to_upper(CITY))
-
-```
-
-No last edited dates before 2015.
+Sources look fine.
 
 ```{r}
-#   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
-#   There are Y values missing...
-dftest <- 
-dfnew %>% 
-  #head(10) %>% 
-  select(siteaddid, STREET_NAME, addrnum, zipcode, X, Y, xcoord, ycoord) %>% 
-  #select(siteaddid, STREET_NAME, addrnum, zipcode, xcoord, ycoord)# %>% 
-  sf::st_as_sf(., coords=c("X", "Y"))
 
-sf::st_crs(dftest) <- googlecrs
+#   accept new roadnames
 
-foo <- sf::st_transform(dftest, crs="EPSG:2278")
-
-#foo <- 
-foo %>% 
-  mutate(xy=sf::st_coordinates(foo))
-
-foo2 <- sf::st_coordinates(foo)
-foo$X <- foo2[,1]
-foo$Y <- foo2[,2]
-
-foo %>% mutate(Dx=xcoord-X,
-               Dy=ycoord-Y) %>% 
-  filter(Dy>-5) %>% 
-  filter(Dy<0) %>% 
-  ggplot(aes(x=Dy)) +
-  geom_histogram()
-
-foo %>% mutate(Dx=xcoord-X,
-               Dy=ycoord-Y) %>% 
-  filter(Dx>0) %>% 
-  filter(Dx<5) %>% 
-  ggplot(aes(x=Dx)) +
-  geom_histogram()
-
-#     Looks good enough. Let's recover the data with bogus Y coordinates.
-
-ObjID <- dfnew %>% 
-  filter(ycoord<13000000) # pull out records with bad Y coordinate
-
-foo[foo$siteaddid %in% ObjID$siteaddid,]
-
-dfnew[dfnew$siteaddid %in% ObjID$siteaddid,]$ycoord <- 
-  unname(foo[foo$siteaddid %in% ObjID$siteaddid,]$Y)
-
-foo <-  df[df$siteaddid %in% ObjID$siteaddid,] %>% 
-  mutate(change="Repaired ycoord by reprojecting") 
-corrections <- bind_rows(corrections, foo)
+dfnew <- dfnew %>% 
+  mutate(roadname=New_street)
 
 #   Safety save
 
 saveRDS(dfnew, paste0(path, "temporary_intermediate_file_4"))
 saveRDS(corrections, paste0(path, "corrections_4.Rds"))
+```
+
+
+```{r}
+#   State Plane, Texas South Central Zone 5401, FIPS 4204, NAD83, EPSG 2278
+#   There are Y values missing...
+
+
+# foo <- sf::st_transform(dftest, crs="EPSG:2278")
 
 ```
 
@@ -1088,6 +1036,9 @@ polygons and look for bad ones.
 If I can, correct the zipcode. If I can't, flag the point as hopeless. 
 
 ```{r more zip}
+
+#####################   stopped here #######################
+
 df_nodups <- 
 dfnew %>% #head(20000) %>% 
   group_by(zipcode, Street_name, addrnum, roadtype, prefix) %>% 
