@@ -488,7 +488,7 @@ get_corrections <- function(df_test, df_base, text_dist, geom_dist, min_votes){
       group_by(roadname) %>%
          summarize(n=n(),
                    addrnum=last(bad_num),
-                   STREET_NAME=last(roadname),
+                   roadname=last(roadname),
                    bad_name=last(bad_name),
                    bad_id=last(bad_id),
                    min_dist=suppressWarnings(min(eucdist))
@@ -1178,9 +1178,6 @@ for (i in 1:nrow(Bad_zips)){
     dfnew[dfnew$siteaddid==Bad_zips[i,]$siteaddid,]$zipcode <- Bad_zips[i,]$Zip 
 }
 
-
-#####################   stopped here #######################
-
 #     Let's look at dups again
 
 df_nodups <- 
@@ -1218,12 +1215,10 @@ corrections <- readRDS(paste0(path, "corrections_5.Rds"))
 ```
 
 ```{r more prefixes}
-
-dfnew <- dfnew %>% 
-  mutate(zipcode=zipcode)  
   
-df_prefix <- dfnew %>% 
-  group_by(zipcode, Street_name, roadtype) %>% 
+df_prefix <- 
+  dfnew %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  group_by(zipcode, roadname, roadtype) %>% 
     summarize(n=n(),
               sumNA = sum(prefix==""),
               sumE = sum(prefix=="E", na.rm=TRUE),
@@ -1240,16 +1235,18 @@ bad_pts <-
 df_prefix %>% filter(sumNA>0) #%>%  arrange(-n) %>%  head(10)
 #   Subset dfnew based on these guys
 df_bad <- inner_join(dfnew, bad_pts, 
-                     by=c("zipcode", "Street_name", "roadtype"))
+                     by=c("zipcode", "roadname", "roadtype")) %>% 
+  sf::st_drop_geometry()
 
 Save_stats <- NULL
 df_worse <- df_bad[df_bad$prefix=="",]
 ####df_worse <- df_worse %>% filter(Street_name=="PEACEFUL CANYON")
+#   For each blank prefix look for the nearest companion with a prefix
 for (i in 1:nrow(df_worse)){
   pt <- df_worse[i,]
-  print(paste("----", pt$addrnum, pt$Street_name, pt$roadtype))
+  print(paste("----", pt$addrnum, pt$roadname, pt$roadtype))
   eraseme <-  df_bad %>% 
-    filter(Street_name==pt$Street_name,
+    filter(roadname==pt$roadname,
            roadtype==pt$roadtype) %>% 
     mutate(eucdist=sqrt((xcoord - pt$xcoord)^2 +
                           (ycoord - pt$ycoord)^2)) %>% 
@@ -1263,7 +1260,7 @@ for (i in 1:nrow(df_worse)){
               sumW = sum(prefix=="W"),
               sumN = sum(prefix=="N"),
               sumS = sum(prefix=="S"),
-              Street_name=last(Street_name)
+              roadname=last(roadname)
                 ) %>%
     mutate(siteaddid=pt$siteaddid, 
            addrnum=pt$addrnum)
@@ -1296,12 +1293,12 @@ dfnew[dfnew$siteaddid %in% ObjID,]$prefix <- Save_stats$prefix_new
 
 saveRDS(dfnew, paste0(path, "temporary_intermediate_file_6"))
 saveRDS(corrections, paste0(path, "corrections_6.Rds"))
-##-----------------------------   stop here
 
 #   Let's take another swipe at it
 
-df_prefix <- dfnew %>% 
-  group_by(zipcode, Street_name, roadtype) %>% 
+df_prefix <- 
+  dfnew %>% sf::st_drop_geometry() %>% # This will speed things considerably
+  group_by(zipcode, roadname, roadtype) %>% 
     summarize(n=n(),
               sumNA = sum(prefix==""),
               sumE = sum(prefix=="E", na.rm=TRUE),
@@ -1318,16 +1315,17 @@ bad_pts <-
 df_prefix %>% filter(sumNA>0) #%>%  arrange(-n) %>%  head(10)
 #   Subset dfnew based on these guys
 df_bad <- inner_join(dfnew, bad_pts, 
-                     by=c("zipcode", "Street_name", "roadtype"))
+                     by=c("zipcode", "roadname", "roadtype")) %>% 
+  sf::st_drop_geometry()
 
 Save_stats <- NULL
 df_worse <- df_bad[df_bad$prefix=="",]
-####df_worse <- df_worse %>% filter(Street_name=="PEACEFUL CANYON")
+####df_worse <- df_worse %>% filter(roadname=="PEACEFUL CANYON")
 for (i in 1:nrow(df_worse)){
   pt <- df_worse[i,]
-  print(paste("----", pt$addrnum, pt$Street_name, pt$roadtype))
+  print(paste("----", pt$addrnum, pt$roadname, pt$roadtype))
   eraseme <-  df_bad %>% 
-    filter(Street_name==pt$Street_name,
+    filter(roadname==pt$roadname,
            roadtype==pt$roadtype) %>% 
     mutate(eucdist=sqrt((xcoord - pt$xcoord)^2 +
                           (ycoord - pt$ycoord)^2)) %>% 
@@ -1341,7 +1339,7 @@ for (i in 1:nrow(df_worse)){
               sumW = sum(prefix=="W"),
               sumN = sum(prefix=="N"),
               sumS = sum(prefix=="S"),
-              Street_name=last(Street_name)
+              roadname=last(roadname)
                 ) %>%
     mutate(siteaddid=pt$siteaddid, 
            addrnum=pt$addrnum)
@@ -1375,21 +1373,23 @@ dfnew[dfnew$siteaddid %in% ObjID,]$prefix <- Save_stats$prefix_new
 saveRDS(dfnew, paste0(path, "temporary_intermediate_file_7"))
 saveRDS(corrections, paste0(path, "corrections_7.Rds"))
 
-#####Save_stats[duplicated(Save_stats$siteaddid),]
 
+dfnew <- readRDS(paste0(path, "temporary_intermediate_file_7"))
+corrections <- readRDS(paste0(path, "corrections_7.Rds"))
 ```
 
 ##   Fix some specific errors manually
 
 ```{r manual}
 
-dfnew <- readRDS(paste0(path, "temporary_intermediate_file_7"))
-corrections <- readRDS(paste0(path, "corrections_7.Rds"))
+
+#####################   stopped here #######################
+
 
 eraseme <- dfnew %>% 
-  mutate(pseudotype=str_extract(Street_name, "\\w+$")) %>% 
+  mutate(pseudotype=str_extract(roadname, "\\w+$")) %>% 
   filter(pseudotype==roadtype) %>% 
-  group_by(Street_name) %>% 
+  group_by(roadname) %>% 
     summarize(roadtype=last(roadtype),
               n=n())
 #   Martin Luther King consistently missing Jr at end
@@ -1441,17 +1441,17 @@ New_street <- c("MARTIN LUTHER KING JR", "BARON BROOK", "BROKEN BACK",
 
 #  First repair type where needed
 
-dfnew[str_detect(dfnew$Street_name, "FAIRWAY DR STE"),]$roadtype <- "DR"
-dfnew[str_detect(dfnew$Street_name, "PAXTON DRIVR"),]$roadtype <- "DR"
-dfnew[str_detect(dfnew$Street_name, "HAVEN CREEK DR/BACKS"),]$roadtype <- "DR"
-dfnew[str_detect(dfnew$Street_name, "BLACK FALCON RD"),]$roadtype <- "RD"
-dfnew[str_detect(dfnew$Street_name, "LA PORTE FWY"),]$roadtype <- "FWY"
-dfnew[str_detect(dfnew$Street_name, "FRANK SCOTT BLVD"),]$roadtype <- "BLVD"
+dfnew[str_detect(dfnew$roadname, "FAIRWAY DR STE"),]$roadtype <- "DR"
+dfnew[str_detect(dfnew$roadname, "PAXTON DRIVR"),]$roadtype <- "DR"
+dfnew[str_detect(dfnew$roadname, "HAVEN CREEK DR/BACKS"),]$roadtype <- "DR"
+dfnew[str_detect(dfnew$roadname, "BLACK FALCON RD"),]$roadtype <- "RD"
+dfnew[str_detect(dfnew$roadname, "LA PORTE FWY"),]$roadtype <- "FWY"
+dfnew[str_detect(dfnew$roadname, "FRANK SCOTT BLVD"),]$roadtype <- "BLVD"
 
 #   Now repair names
 
 for (i in 1:length(Old_street)) {
-  dfnew[str_detect(dfnew$Street_name,Old_street[i]),]$Street_name <- New_street[i]
+  dfnew[str_detect(dfnew$roadname,Old_street[i]),]$roadname <- New_street[i]
 }
 
 ObjID <- dfnew %>% filter(str_detect(STREET_NAME, 
@@ -1459,7 +1459,7 @@ ObjID <- dfnew %>% filter(str_detect(STREET_NAME,
 
 foobar <-  df[df$siteaddid %in% ObjID$siteaddid,] %>% 
   mutate(change=paste("Corrected street name to", 
-                       dfnew[dfnew$siteaddid %in% ObjID$siteaddid,]$Street_name)) 
+                       dfnew[dfnew$siteaddid %in% ObjID$siteaddid,]$roadname)) 
 corrections <- bind_rows(corrections, foobar)
 saveRDS(corrections, paste0(path, "Final_corrections.Rds"))
 
@@ -1476,11 +1476,11 @@ saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
 
 dfnew <- 
 dfnew %>% 
-  group_by(zipcode, Street_name, addrnum, roadtype, prefix) %>% 
+  group_by(zipcode, roadname, addrnum, roadtype, prefix) %>% 
   summarise(n=n(),
             addrnum=last(addrnum),
             prefix=last(prefix),
-            Street_name=last(Street_name),
+            roadname=last(roadname),
             roadtype=last(roadtype),
             City=last(CITY),
             zipcode=last(zipcode),
@@ -1492,7 +1492,7 @@ dfnew %>%
             ycoord=mean(ycoord),
             siteaddid=last(siteaddid)
             ) %>% 
-  select(addrnum, prefix, Street_name, roadtype, City, zipcode,
+  select(addrnum, prefix, roadname, roadtype, City, zipcode,
          n, Lat, Lon, Xstd, Ystd, X=xcoord, Y=ycoord, siteaddid)  
 
 
