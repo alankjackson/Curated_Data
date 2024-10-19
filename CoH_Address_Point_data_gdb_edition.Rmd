@@ -1383,10 +1383,8 @@ corrections <- readRDS(paste0(path, "corrections_7.Rds"))
 ```{r manual}
 
 
-#####################   stopped here #######################
-
-
-eraseme <- dfnew %>% 
+eraseme <- 
+  dfnew %>% sf::st_drop_geometry() %>% # This will speed things considerably
   mutate(pseudotype=str_extract(roadname, "\\w+$")) %>% 
   filter(pseudotype==roadtype) %>% 
   group_by(roadname) %>% 
@@ -1400,7 +1398,7 @@ Old_street <- c("MARTIN LUTHER KING$", "BARON BROOK DR", "BROKEN BACK DR STE",
                 "HAYBROOK DRIVE", "SANOUR DR", "FAIRWAY DR STE",
                 "SHERWOOD RIDGE DRIVE", "BRITTMOORE PARK DRIV", 
                 "CANDLELIGHT PLACE DR", "STEINHAGEN RD", "BLACK FALCON RD",
-                "NICHOLSON ST", "SINGLE OAK ST", "PALSTON BEND LN",
+                "SINGLE OAK ST", "PALSTON BEND LN",
                 "SIENNA COVE LN", "LA PORTE FWY", "COMETS RUN",
                 "OAK RIDGE DRIVE", "BEMBRIDGE DRIVE", "PAXTON DRIVR",
                 "GILBERT SCOTT DR", "GREENS LANDING DR", 
@@ -1413,16 +1411,16 @@ Old_street <- c("MARTIN LUTHER KING$", "BARON BROOK DR", "BROKEN BACK DR STE",
                 "SMITHFIELD CROSSING LN", "DA VINA LN", "SCROGGINS LN",
                 "1510TH BEVIS ST", "PECAN ST STE", "LEADER ST", "SAGECIRCLE ST 1",
                 "CENTRAL AVE", "FRANK SCOTT BLVD", "ALCEA CT", "CLIFF MARSHAL ST",
-                "COUNTRY VILLAGE BLVD", "CREEK CIR", "FRANK SCOTT BLVD",
+                "COUNTRY VILLAGE BLVD", "CREEK CIR", 
                 "HOBBY AIRPORT LOOP", "MOSSY OAK DR", "MOUNTAIN MAPLE CT",
-                "OLD MAIN LOOP", "PETINA CYPRESS CT")
+                "OLD MAIN LOOP", "PETINA CYPRESS CT", "OLIVER COTTON WAY")
 
 New_street <- c("MARTIN LUTHER KING JR", "BARON BROOK", "BROKEN BACK",
                 "COLBURN", "SAGEBROOK", "LINBROOK",
                 "HAYBROOK", "SANOUR", "FAIRWAY",
                 "SHERWOOD RIDGE", "BRITTMOORE PARK",
                 "CANDLELIGHT PLACE", "STEINHAGEN", "BLACK FALCON",
-                "NICHOLSON", "SINGLE OAK", "PALSTON BEND",
+                "SINGLE OAK", "PALSTON BEND",
                 "SIENNA COVE", "LA PORTE", "COMETS",
                 "OAK RIDGE", "BEMBRIDGE", "PAXTON",
                 "GILBERT SCOTT", "GREENS LANDING",
@@ -1435,9 +1433,9 @@ New_street <- c("MARTIN LUTHER KING JR", "BARON BROOK", "BROKEN BACK",
                 "SMITHFIELD CROSSING", "DA VINA", "SCROGGINS",
                 "BEVIS", "PECAN", "LEADER", "SAGECIRCLE",
                 "CENTRAL", "FRANK SCOTT", "ALCEA", "CLIFF MARSHAL",
-                "COUNTRY VILLAGE", "CREEK", "FRANK SCOTT",
+                "COUNTRY VILLAGE", "CREEK", 
                 "HOBBY AIRPORT", "MOSSY OAK", "MOUNTAIN MAPLE",
-                "OLD MAIN", "PETINA CYPRESS")
+                "OLD MAIN", "PETINA CYPRESS", "OLIVER COTTON")
 
 #  First repair type where needed
 
@@ -1451,10 +1449,11 @@ dfnew[str_detect(dfnew$roadname, "FRANK SCOTT BLVD"),]$roadtype <- "BLVD"
 #   Now repair names
 
 for (i in 1:length(Old_street)) {
+  print(Old_street[i])
   dfnew[str_detect(dfnew$roadname,Old_street[i]),]$roadname <- New_street[i]
 }
 
-ObjID <- dfnew %>% filter(str_detect(STREET_NAME, 
+ObjID <- dfnew %>% filter(str_detect(New_street, 
                                   paste(Old_street, collapse="|")))  
 
 foobar <-  df[df$siteaddid %in% ObjID$siteaddid,] %>% 
@@ -1470,33 +1469,59 @@ saveRDS(corrections, paste0(path, "Final_corrections.Rds"))
 #   Complete file after cleanup
 saveRDS(dfnew, paste0(path, "COH_Address_Locations.rds"))
 
+
+#####################   stopped here #######################
+
 ########   rebuild dfnew from scratch. Now it only needs to drive the 
 ########   averaging process. Update dfnew accordingly and there will be no 
 ########   duplicates left
 
-dfnew <- 
+Keepcrs <- sf::st_crs(dfnew)
+
+dfnew2 <- 
 dfnew %>% 
+  dplyr::mutate(Lon = sf::st_coordinates(.)[,1],
+                Lat = sf::st_coordinates(.)[,2]) %>% 
+  sf::st_drop_geometry() %>% 
   group_by(zipcode, roadname, addrnum, roadtype, prefix) %>% 
   summarise(n=n(),
             addrnum=last(addrnum),
             prefix=last(prefix),
             roadname=last(roadname),
             roadtype=last(roadtype),
-            City=last(CITY),
+            municipality=last(municipality),
             zipcode=last(zipcode),
-            Lat=mean(Y),
-            Lon=mean(X),
+            Lat=median(Lat),
+            Lon=median(Lon),
             Xstd=sd(xcoord),
             Ystd=sd(ycoord),
+            xmed=median(xcoord),
+            ymed=median(ycoord),
             xcoord=mean(xcoord),
             ycoord=mean(ycoord),
             siteaddid=last(siteaddid)
             ) %>% 
-  select(addrnum, prefix, roadname, roadtype, City, zipcode,
-         n, Lat, Lon, Xstd, Ystd, X=xcoord, Y=ycoord, siteaddid)  
+  select(addrnum, prefix, roadname, roadtype, municipality, zipcode,
+         n, Lat, Lon, Xstd, Ystd, X=xcoord, xmed, Y=ycoord, ymed, siteaddid)  
 
+dfnew2 <- dfnew2 %>% 
+  mutate(DeltaX=abs(X-xmed), DeltaY=abs(Y-ymed))
+
+#   Final cleanup. Clusters of identical addresses that have too large a spread
+#   in location, based on difference between median and mean locations, I will
+#   just delete if there are fewer than 5 points and the deltaX or 
+#   deltaY are greater than 150.
+
+dfnew2 <- dfnew2 %>% 
+  filter(!(n<5 & DeltaX>150)) %>% 
+  filter(!(n<5 & DeltaY>150))  
 
 #   File suitable for using in geocoding
+
+dfnew <- dfnew2 %>% 
+  select(Street_num=addrnum, Prefix=prefix, Street_name=roadname, 
+         Street_type=roadtype, City=municipality, Zipcode=zipcode,
+         n, Lat, Lon, Xstd, Ystd, X=xmed, Y=ymed, OBJECTID=siteaddid)
 
 saveRDS(dfnew, paste0(path, "COH_Geocoding_Locations.rds"))
 
