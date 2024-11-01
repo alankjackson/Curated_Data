@@ -36,6 +36,7 @@ AREAWATER_PART 	14 	Calculated water area of the overlapping part in square mete
 #   Setup
 
 library(tidyverse)
+library(tidycensus)
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Census_Crosswalks/"
 
@@ -43,6 +44,52 @@ googlecrs <- "EPSG:4326"
 
 ```
 
+##        Start with tests to check understanding
+
+Do I understand the relationship between census blocks and ZCTA's? Let's make
+a map to compare them and see if it agrees with my understanding.
+
+```{r}
+
+vars <- load_variables(2020, "dhc", cache=TRUE)
+vars2 <- load_variables(2020, "dp", cache=TRUE)
+
+dhc_vars <- c(Pop_in_house="P15_001N",
+              Householder="H10_001N",
+              Renter="H10_010N",
+              House_units="H1_001N",
+              Urban_Rural="H2_001N",
+              Urban_house="H2_002N",
+              Pop_in_units="H8_001N",
+              House_Fam="P16_002N",
+              Pop_Total="P1_001N",
+              Pop_Urban="P2_002N",
+              Pop_Rural="P2_003N"
+              )
+
+dhc <- get_decennial(geography="block",
+                     variables=dhc_vars,
+                     sumfile="dhc",
+                     year=2020,
+                     state="TX",
+                     county="201",
+                     geometry=TRUE,
+                     output="wide")
+
+ZCTA_geom <- tidycensus::get_acs(geography = "zcta",
+                variables =  "B01003_001", 
+                progress_bar = FALSE,
+                year = 2020, geometry=TRUE)
+
+# foo <- dhc %>% 
+#   mutate(dPop1=Pop_tot-Pop_Total,
+#          dPop2=Pop_tot-Pop_Totalb,
+#          dHouse1=Householder-Household_size,
+#          dHouse2=Householder-House_type
+#          ) %>% 
+#   select(GEOID, NAME, dPop1, dPop2, dHouse1, dHouse2)
+
+```
 
 
 
