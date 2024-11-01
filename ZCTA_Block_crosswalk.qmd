@@ -1,0 +1,54 @@
+---
+title: "Crosswalk ZCTAs to Census blocks & tracts"
+author: "Alan Jackson"
+format: html
+editor: source
+---
+
+##    Read in the 2020 census realtionship files
+
+https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.2020.html
+
+
+2020 Zip Code Tabulation Area (ZCTA5) to 2020 Census Tabblock Relationship File Layout (tab20_zcta520_tabblock20_natl.txt)
+
+Relationship File Column Name 	Maximum Length 	Column Definition
+OID_ZCTA5_20 	22 	OID of 2020 ZCTA5
+GEOID_ZCTA5_20 	5 	GEOID of the 2020 ZCTA5
+NAMELSAD_ZCTA5_20 	100 	Name with translated Legal/Statistical Area Description of 2020 ZCTA5
+AREALAND_ZCTA5_20 	14 	Total land area of 2020 ZCTA5 in square meters
+AREAWATER_ZCTA5_20 	14 	Total water area of 2020 ZCTA5 in square meters
+MTFCC_ZCTA5_20 	5 	MAFTIGER feature class code of 2020 ZCTA5
+CLASSFP_ZCTA5_20 	2 	FIPS class code of 2020 ZCTA5
+FUNCSTAT_ZCTA5_20 	1 	Functional status of 2020 ZCTA5
+OID_TABBLOCK_20 	22 	OID of 2020 tabulation block
+GEOID_TABBLOCK_20 	15 	GEOID of the 2020 tabulation block
+NAMELSAD_TABBLOCK_20 	100 	Name with translated Legal/Statistical Area Description of 2020 tabulation block
+AREALAND_TABBLOCK_20 	14 	Land area of 2020 tabulation block in square meters
+AREAWATER_TABBLOCK_20 	14 	Water area of 2020 tabulation block in square meters
+MTFCC_TABBLOCK_20 	5 	MAFTIGER feature class code of 2020 tabulation block
+CLASSFP_TABBLOCK_20 	2 	FIPS class code of 2020 tabulation block
+FUNCSTAT_TABBLOCK_20 	1 	Functional status of 2020 tabulation block
+AREALAND_PART 	14 	Calculated land area of the overlapping part in square meters
+AREAWATER_PART 	14 	Calculated water area of the overlapping part in square meters
+
+```{r}
+#   Setup
+
+library(tidyverse)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Census_Crosswalks/"
+
+googlecrs <- "EPSG:4326"
+
+```
+
+
+
+
+
+
+
+
+
+
