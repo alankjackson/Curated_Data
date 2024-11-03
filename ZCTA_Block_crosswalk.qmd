@@ -37,10 +37,30 @@ AREAWATER_PART 	14 	Calculated water area of the overlapping part in square mete
 
 library(tidyverse)
 library(tidycensus)
+library(tmap) 
 
 path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Census_Crosswalks/"
 
 googlecrs <- "EPSG:4326"
+
+Tabblock <- read_delim(paste0(path, "tab20_zcta520_tabblock20_natl.txt"),
+                       delim="|",
+                       col_types="cccnnccccccnnccnn")
+
+saveRDS(Tabblock, paste0(path, "Raw_ZCTA_to_TabBlock.rds"))
+
+#   Cleanup and save
+
+Tabblock <- Tabblock %>% 
+  select(ZCTA=GEOID_ZCTA5_20, GEOID_TABBLOCK_20, 
+         AREALAND_ZCTA5_20,
+         AREALAND_TABBLOCK_20,
+         AREALAND_PART) %>% 
+  filter(!is.na(ZCTA)) %>% 
+  mutate(Blk_grp = stringr::str_sub(GEOID_TABBLOCK_20, 1, 12)) %>% 
+  mutate(Tract = stringr::str_sub(GEOID_TABBLOCK_20, 1, 11))
+
+saveRDS(Tabblock, paste0(path, "ZCTA_to_TabBlock.rds"))
 
 ```
 
@@ -92,6 +112,29 @@ ZCTA_geom <- tidycensus::get_acs(geography = "zcta",
 ```
 
 
+##        Let's make a map
+
+```{r}
+
+tmap::tmap_options(basemaps="OpenStreetMap")
+tmap_mode("view")
+
+foo1 <- dhc %>% filter(stringr::str_detect(GEOID, "^4820151"))
+foo2 <- ZCTA_geom %>% filter(stringr::str_detect(GEOID, "^7700"))
+
+
+  tm_shape(foo1) +
+  tm_polygons(alpha=0.5, popup.vars=c("GEOID", 
+                                           "NAME",
+                                           "Pop_Total",
+                                           "House_units",
+                                           "Renter")) +
+  tm_shape(foo2) +
+    tm_polygons(alpha=0, lwd=3, border.col="red") +
+    tm_borders(col="red")
+
+
+```
 
 
 
