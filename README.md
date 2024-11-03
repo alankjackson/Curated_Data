@@ -314,5 +314,26 @@ which has pop figures for 2022
 
 Zipcode_Pop_2022.rds
 
+-------------------------------
+Union of Concerned Scientists Chronic Inundation data
+https://www.ucsusa.org/resources/underwater
+
+Spreadsheet of zipcodes and scenarios for chronic inundation
+
+SeaLevel/UCS_data.rds
+SeaLevel/UCS_sfdata.rds (with ZCTA polygons attached)
+
+-------------------------------
+Crosswalk file ZCTA to blocks - with intersecting groups and tracts
+https://www.census.gov/geographies/reference-files/time-series/geo/relationship-files.2020.html
+
+Census_Crosswalks/Raw_ZCTA_to_TabBlock.rds
+Census_Crosswalks/ZCTA_to_TabBlock.rds
+
+
+
+
+
+
 
 
