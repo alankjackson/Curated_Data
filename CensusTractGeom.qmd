@@ -25,6 +25,29 @@ Grab the geometries and save
 
 ```{r}
 
+States <- c("AL", "NY", "AK", "AZ", "AR", "CA", "LA", "CO", "CT", "DE", "DC",
+"FL", "GA", "MO", "SC", "HI", "ID", "IL", "IN", "KY", "IA", "KS", "ME", "MD",
+"MA", "MI", "MN", "MS", "MT", "NE", "NV", "NH", "NJ", "NM", "NC", "ND", "OH",
+"OK", "OR", "PA", "TX", "RI", "SD", "TN", "UT", "VT", "VA", "WA", "WV", "WI",
+"WY", "PR")
+
+# state="AL"
+
+for (state in States) {
+  
+  ACS <- get_acs(geography="tract",
+                 variables=c(Pop="B01001_001"),
+                 year=2023,
+                 state=state,
+                 output="wide",
+                 geometry=TRUE) 
+    
+    ACS <- ACS %>% 
+      st_transform(crs=google_crs)
+  
+  saveRDS(ACS, paste0(path, "ACS_2023_", state, ".rds"))
+}
+  
 ```
 
 
