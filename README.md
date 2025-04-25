@@ -330,7 +330,14 @@ https://www.census.gov/geographies/reference-files/time-series/geo/relationship-
 Census_Crosswalks/Raw_ZCTA_to_TabBlock.rds
 Census_Crosswalks/ZCTA_to_TabBlock.rds
 
+-------------------------------
+Redlining
+Data downloaded Jan 2025 from 
+https://dsl.richmond.edu/panorama/redlining/data
 
+-------------------------------
+Create files for each state of census tract geometries and population
+CensusTractGeom.qmd
 
 
 
