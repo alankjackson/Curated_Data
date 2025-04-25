@@ -1,0 +1,32 @@
+---
+title: "2023 Census Tract Geometries"
+author: "Alan Jackson"
+date: "2025-04-25"
+format: html
+---
+
+##    Download and save the census tract geometries for 2023
+
+```{r}
+
+library(tidyverse)
+library(sf)
+library(tidycensus)
+
+path <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Census_Tracts_2023"
+
+census_api_key("c458095036ca1037f97b9c7019b6a7ac2dbf90d4")
+
+google_crs <- 4326
+
+```
+
+Grab the geometries and save
+
+```{r}
+
+```
+
+
+
+
