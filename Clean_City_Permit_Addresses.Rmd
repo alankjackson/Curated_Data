@@ -8,11 +8,12 @@ output: html_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(postmastr)
-detach("package:GeocodeHou", unload=TRUE)
+# detach("package:GeocodeHou", unload=TRUE)
 library(GeocodeHou)
 
 savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Permits/"
-df <- readRDS(paste0(savepath, "Permit_data.rds"))
+# df <- readRDS(paste0(savepath, "Permit_data.rds"))
+df <- readRDS(paste0(savepath, "Permit_data_9-9-2024_6-7-2026.rds"))
 
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -240,9 +241,12 @@ saveRDS(Failed_match, paste0(savepath, "Keep_Failedmatch.rds"))
 ```{r bad zip}
 
 Failed_match <- Failed_match %>% mutate(Correction=NA)
+Fixed <- 0
+Failed <- 0
 
 for (i in 1:nrow(Failed_match)){
   if (i%%100==0) { print(paste("---",i,"---")) }
+  Failed <- Failed + 1
   target <- Failed_match[i,]
   tmp <- repair_zipcode(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -251,8 +255,10 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Lon <- tmp$Lon
     Failed_match[i,]$Fail <- paste(Failed_match[i,]$Fail, "Zipcode")
     Failed_match[i,]$Correction <- tmp$New_zipcode
+    Fixed <- Fixed + 1
   } 
 }
+print(paste("Names repaired", Fixed, "out of", Failed))
 
 ```
 
@@ -260,10 +266,13 @@ for (i in 1:nrow(Failed_match)){
 
 ```{r bad names}
 
+Fixed <- 0
+Failed <- 0
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Street_name") {next} # skip if name isn't the issue
   if (Failed_match[i,]$Lat > 0) {next} # skip if zipcode resolved it
   if (i%%10==0) { print(paste("---",i,"---")) }
+  Failed <- Failed + 1
   target <- Failed_match[i,]
   tmp <- repair_name(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -271,10 +280,12 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Lat <- tmp$Lat
     Failed_match[i,]$Lon <- tmp$Lon
     Failed_match[i,]$Correction <- tmp$New_name
+    Fixed <- Fixed + 1
   } else {
     Failed_match[i,]$Fail <- paste("Street_name",tmp$Fail)
   }
 }
+print(paste("Names repaired", Fixed, "out of", Failed))
 
 ```
 
@@ -282,9 +293,12 @@ for (i in 1:nrow(Failed_match)){
 
 ```{r bad types}
 
+Fixed <- 0
+Failed <- 0
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Street_type") {next} # skip if type isn't the issue
   if (i%%10==0) { print(paste("---",i,"---")) }
+  Failed <- Failed + 1
   target <- Failed_match[i,]
   tmp <- repair_type(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -292,10 +306,12 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Lat <- tmp$Lat
     Failed_match[i,]$Lon <- tmp$Lon
     Failed_match[i,]$Correction <- tmp$New_type
+    Fixed <- Fixed + 1
   } else {
     Failed_match[i,]$Fail <- paste("Street_type",tmp$Fail)
   }
 }
+print(paste("Types repaired", Fixed, "out of", Failed))
 
 ```
 
@@ -304,10 +320,13 @@ for (i in 1:nrow(Failed_match)){
 
 ```{r bad numbers}
 
+Fixed <- 0
+Failed <- 0
 
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Street_num") {next} # skip if name isn't the issue
   if (i%%10==0) { print(paste("---",i,"---")) }
+  Failed <- Failed + 1
   target <- Failed_match[i,]
   tmp <- repair_number(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -315,10 +334,12 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Lat <- tmp$Lat
     Failed_match[i,]$Lon <- tmp$Lon
     Failed_match[i,]$Correction <- tmp$Result
+    Fixed <- Fixed + 1
   } else {
     Failed_match[i,]$Fail <- paste("Street_num",tmp$Fail)
   }
 }
+print(paste("Numbers repaired", Fixed, "out of", Failed))
 
 ```
 
@@ -328,9 +349,12 @@ for (i in 1:nrow(Failed_match)){
 
 ```{r bad prefix}
 
+Fixed <- 0
+Failed <- 0
 for (i in 1:nrow(Failed_match)){
   if (Failed_match[i,]$Fail!="Prefix") {next} # skip if name isn't the issue
   if (i%%10==0) { print(paste("---",i,"---")) }
+  Failed <- Failed + 1
   target <- Failed_match[i,]
   tmp <- repair_prefix(target$pm.house, target$pm.preDir, target$pm.street,
                        target$pm.streetSuf, target$Zipcode)
@@ -338,10 +362,12 @@ for (i in 1:nrow(Failed_match)){
     Failed_match[i,]$Lat <- tmp$Lat
     Failed_match[i,]$Lon <- tmp$Lon
     Failed_match[i,]$Correction <- tmp$New_prefix
+    Fixed <- Fixed + 1
   } else {
     Failed_match[i,]$Fail <- paste("Prefix",tmp$Fail)
   }
 }
+print(paste("Prefixes repaired", Fixed, "out of", Failed))
 
 
 ```
@@ -410,22 +436,7 @@ Final <- Final %>%
   rename(Number=pm.house, Prefix=pm.preDir, Name=pm.street, Type=pm.streetSuf,
          Original_address=Address, Cleaned_address=Output)
 
-saveRDS(Final, paste0(savepath, "Clean_Final_2017_to_Mar_2022.rds"))
-
-
-```
-
-```{r}
-
-#     Let's do a little repair until whole thing is rerun.
-
-
-Failed_match <- readRDS(paste0(savepath, "Keep_Failedmatch_final.rds"))
-
-Failed_match[str_detect(replace_na(Failed_match$Correction, ""),
-                        "^\\d{5}$"),]$Fail <- 
-  "Street_name Zipcode"
-           
+saveRDS(Final, paste0(savepath, "Clean_Final_9-9-2024_to_6-7-2026.rds"))
 
 
 ```
