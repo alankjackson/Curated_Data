@@ -1,0 +1,92 @@
+---
+title: "Test Scraping"
+author: "Alan Jackson"
+format: html
+---
+
+```{r}
+#| echo: false
+#| warning: false
+
+# Install packages if you haven't already
+# install.packages(c("rvest", "tidyverse"))
+
+library(rvest)
+library(tidyverse)
+
+# Define the target URL
+# url <- "https://houstonhealth.org"
+url <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-thursday-october-292026"
+
+
+# Read the HTML page
+html_content <- read_html(url)
+
+# Get all webpage text as a single string to parse with regex
+page_text <- html_content %>% html_text()
+
+#   Summaries
+
+# Accurate extraction using regular expressions
+extract_metric <- function(text, category) {
+  # Regex to find the category and pull the next two distinct words/numbers
+  pattern <- paste0(category, "\\s*\\n?\\s*([A-Za-z]+)\\s*\\n?\\s*([0-9,]+)")
+  matches <- str_match(text, pattern)
+  
+  tibble(
+    Category = category,
+    Status   = matches[1, 2],
+    Value    = as.numeric(gsub(",", "", matches[1, 3]))
+  )
+}
+
+# Run the extraction for each primary group
+tree_summary  <- extract_metric(page_text, "TREE POLLEN")
+weed_summary  <- extract_metric(page_text, "WEED POLLEN")
+grass_summary <- extract_metric(page_text, "GRASS POLLEN")
+mold_summary  <- extract_metric(page_text, "MOLD SPORES")
+
+# Combine into a clean summary table
+summary_table <- bind_rows(tree_summary, weed_summary, grass_summary, mold_summary)
+
+
+# 1. Scrape the detailed list items (contains the raw breakdown strings)
+raw_list_items <- html_content %>% 
+  html_nodes("li") %>% 
+  html_text(trim = TRUE)
+
+# 2. Filter and structure the data using text processing
+pollen_data <- tibble(raw_text = raw_list_items) %>%
+  # Filter only rows that contain the separator ":"
+  filter(str_detect(raw_text, ":")) %>%
+  # Split the text into Type and Count components
+  separate(raw_text, into = c("Type", "Count"), sep = ":\\s*") %>%
+  # Idiots.  Some sort of non-printing trash in the fields
+  mutate(Count = str_remove(Count, "\\W")) |> 
+  # Convert counts to integers (removing any formatting commas)
+  mutate(Count = as.numeric(str_remove_all(Count, ","))) %>%
+  # get rid of superfluous lines
+  filter_out(str_detect(Type, "Call Center|Emergency"))
+
+  # Add tree, weed, or mold designation
+
+pollen_data <- pollen_data |> 
+  mutate(
+    # Create a cumulative sum group ID based on occurrences of "Other"
+    group_id = lag(cumsum(str_detect(Type, "Other")), default=0),
+    
+    # Assign the Class based on the group ID
+    Class = case_when(
+      group_id == 0 ~ "Tree",
+      group_id == 1 ~ "Weed",
+      TRUE          ~ "Mold"
+    )
+  ) %>%
+  select(-group_id) # Remove the temporary helper column
+
+# Print out the structured table of non-zero counts
+pollen_data %>% 
+  filter(Count > 0) %>% 
+  print(n = Inf)
+
+```
