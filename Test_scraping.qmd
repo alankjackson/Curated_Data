@@ -17,13 +17,31 @@ library(tidyverse)
 # Define the target URL
 # url <- "https://houstonhealth.org"
 url <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-thursday-october-292026"
+url <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-wednesday-october-282026"
+url <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-friday-october-30-2026"
 
+url_base <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-"
+url1 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%d%Y")))
+url2 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%d-%Y")))
+###################################
+rate <- rate_backoff(pause_base = 1, max_times = 3)
+safe_read_html <- safely(insistently(read_html, rate = rate))
 
+attempt_1 = map(url1, safe_read_html)
+result_1  = map(attempt_1, "result")
+error_1   = map(attempt_1, "error")
+
+html_content = if_else(
+      map_lgl(result_1, is.null),
+      map(url2, safe_read_html) %>% map("result"),
+      result_1
+    )
+###################################
 # Read the HTML page
-html_content <- read_html(url)
+# html_content <- read_html(url)
 
 # Get all webpage text as a single string to parse with regex
-page_text <- html_content %>% html_text()
+page_text <- html_content[[1]] %>% html_text()
 
 #   Summaries
 
@@ -51,7 +69,7 @@ summary_table <- bind_rows(tree_summary, weed_summary, grass_summary, mold_summa
 
 
 # 1. Scrape the detailed list items (contains the raw breakdown strings)
-raw_list_items <- html_content %>% 
+raw_list_items <- html_content[[1]] %>% 
   html_nodes("li") %>% 
   html_text(trim = TRUE)
 
