@@ -1,0 +1,145 @@
+---
+title: "Read newer city permit data"
+author: "Alan Jackson"
+format: html
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+
+savepath <-  "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Houston_Permits/"
+
+url_begin_a <- "https://www.houstontx.gov/planning/DevelopRegs/docs_pdfs/Permit_eReport/"
+url_begin_b <- "https://www.houstonpermittingcenter.org/sites/g/files/nwywnm431/files/"
+
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Paths changed at the end of 2025. Most of December is missing - the links on the
+website give a "Page not found". Note that Jan 1-13 is special and was 
+downloaded manually.
+
+```{r} 
+#| echo: FALSE 
+#| warning: FALSE
+
+#   Read in list of files and read them in for 2025
+
+filenames <- read_csv(paste0(savepath, "URLs_to_12_1_2025.txt"))
+
+for (filename in filenames$Filenames) { # read files in and save them
+  print(paste("Read file", filename))
+  if (str_detect(filename, "^#")) {next} # bad file, commented out
+  outname <- str_remove(filename, "/|\\s")
+  print(paste("Output", outname))
+  download.file(paste0(url_begin_a, filename), destfile=paste0(savepath, outname), mode="wb")
+}
+
+#   Read in list of files and read them in for 2026
+
+filenamesb <- read_csv(paste0(savepath, "URLs_Jan_2026_to_6_24_2026.txt"))
+
+for (filename in filenamesb$Filenames) { # read files in and save them
+  print(paste("Read file", filename))
+  if (str_detect(filename, "^#")) {next} # bad file, commented out
+  outname <- str_remove(filename, "/|\\s")
+  print(paste("Output", outname))
+  download.file(paste0(url_begin_b, filename), destfile=paste0(savepath, outname), mode="wb")
+}
+
+#   had to download these manually
+filenames <- filenames %>% add_row(Filenames="2025Web-eReport-01-06-2025.docx")
+filenamesb <- filenamesb %>% add_row(Filenames="2026-05April27_May%2003.xlsx")
+
+#   Combine filename files
+
+filenames <- rbind(filenames, filenamesb)
+
+```
+
+
+parse files
+
+
+```{r}
+
+#   Now parse each file
+
+# outname <- "2025Web-eReport-Permits-12-01-2025.xlsx"
+# outname <- "2024Web%20eReport%20-%2012-02-2024.docx"
+# outname <- "2024Web-eReport-Permits-12-03-2024-to-12-30-2024.xlsx"
+
+for (filename in filenames$Filenames) { # read files in and extract
+  if (str_detect(filename, "^#")) {next} # bad file, commented out
+  filename <- str_replace(filename,"doc$", "docx") # I reformatted the doc file
+  filename <- str_replace(filename,"pdf$", "docx") # I reformatted the pdf file
+  outname <- str_remove(filename, "/|\\s")
+  outname <- str_remove(outname, "^\\d*/")
+  # outname <- str_replace_all(outname, "%20", "-")
+  print(paste("Input", outname))
+  fileout <- paste0(savepath, outname, ".rds")
+  fileout <- str_replace_all(fileout, "%20", "-")
+  
+  if (str_detect(outname, "xlsx")) { # Oh for God's sake, some are excel????
+      tmp <- readxl::read_excel(paste0(savepath, outname), col_names=FALSE)  
+      tmp <- tmp[-c(1:5),] 
+      names(tmp) <- c("Zipcode", "Permit_date", "Permit_type", "Project_no", 
+                    "Address", "Comments")
+      tmp <- tmp %>% 
+        filter(str_detect(Zipcode, "^77"))
+      if (!str_detect(tmp$Permit_date[1], "/")){ # not always stored as a date in excel
+        tmp <- tmp %>% mutate(Permit_date = 
+                                as.character(
+                                  as.Date(as.numeric(Permit_date), 
+                                          origin = "1899-12-30")))
+      }
+      saveRDS(tmp, fileout)
+  } else {
+    report <- docxtractr::read_docx(paste0(savepath, outname))
+    tables <- docxtractr::docx_extract_all_tbls(report)
+    if (length(tables[[1]])>=6){
+      tmp <- tables[[1]]
+    } else {
+      tmp <- tables[[2]]
+    }
+    tmp <- tmp[-c(1:2),] 
+    names(tmp) <- c("Zipcode", "Permit_date", "Permit_type", "Project_no", 
+                    "Address", "Comments")
+    tmp <- tmp %>% 
+      filter(str_detect(Zipcode, "^77"))  
+    
+    saveRDS(tmp, fileout)
+    
+  }
+}
+
+```
+
+Join the tables together
+
+```{r} 
+#| echo: FALSE 
+#| warning: FALSE
+
+library(purrr)
+
+# 1. Get all .rds files in your directory
+files <- list.files(path = savepath, pattern = "\\.rds$", full.names = TRUE)
+
+# 2. Filter for files modified within the last week
+# Sys.time() - as.difftime(1, units = "weeks") computes the cutoff time
+recent_files <- files[file.info(files)$mtime > (Sys.time() - as.difftime(1, units = "weeks"))]
+
+# 3. Read and combine into a single data frame
+combined_data <- recent_files %>% 
+  map(readRDS) %>% 
+  bind_rows()
+
+saveRDS(combined_data,  paste0(savepath, "Permit_data_9-9-2024_6-7-2026.rds"))
+```
+
+
+
+
+
+
