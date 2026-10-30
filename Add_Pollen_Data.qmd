@@ -1,7 +1,7 @@
 ---
 title: "Add New Pollen"
 format: html
-editor: visual
+editor: source
 ---
 
 ## Add new pollen data
@@ -291,7 +291,7 @@ saveRDS(df, paste0(savepath, "MasterPollenData.rds"))
 
 ```
 
-##        Attach low, med. heavy, extreme qualifiers and Tree or Grass or Weeds
+## Attach low, med. heavy, extreme qualifiers and Tree or Grass or Weeds
 
 ```{r qualifiers}
 
@@ -349,7 +349,3 @@ df <- df %>%
 
 
 ```
-
-
-
-
