@@ -2,10 +2,18 @@ library(rvest)
 library(tidyverse)
 
 # Define the target URL
+#   The date might have a dash, or maybe not. The day may have a leading zero, or maybe not.
 # url <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-thursday-october-292026"
 url_base <- "https://www.houstonhealth.org/services/pollen-mold/houston-pollen-mold-count-"
-url1 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%d%Y")))
-url2 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%d-%Y")))
+url1 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%e%Y")))
+url2 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%e-%Y")))
+url3 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%d%Y")))
+url4 <- paste0(url_base, tolower(format(Sys.Date(), "%A-%B-%d-%Y")))
+
+# # url1 <- paste0(url_base, "monday-november-92026")
+# url2 <- paste0(url_base, "monday-november-9-2026")
+
+savepath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/PollenAndMold/raw/"
 
 ###################################
 ####      Read in the url
@@ -19,6 +27,18 @@ error_1   = map(attempt_1, "error")
 html_content = if_else(
   map_lgl(result_1, is.null),
   map(url2, safe_read_html) %>% map("result"),
+  result_1
+)
+
+html_content = if_else(
+  map_lgl(result_1, is.null),
+  map(url3, safe_read_html) %>% map("result"),
+  result_1
+)
+
+html_content = if_else(
+  map_lgl(result_1, is.null),
+  map(url4, safe_read_html) %>% map("result"),
   result_1
 )
 ####################################
@@ -88,11 +108,20 @@ pollen_data <- pollen_data |>
   ) %>%
   select(-group_id) # Remove the temporary helper column
 
-#   Print out summary
+#   Print out heading and summary
+print("----------------------------------\n")
+print(now())
+
 summary_table |> 
   print(n=Inf)
+
+saveRDS(summary_table, paste0(savepath, "Summary_", today(), ".rds"))
+# saveRDS(summary_table, paste0(savepath, "Summary_2026-11-09.rds"))
 
 # Print out the structured table of non-zero counts
 pollen_data %>% 
   filter(Count > 0) %>% 
   print(n = Inf)
+
+saveRDS(pollen_data, paste0(savepath, "Details_", today(), ".rds"))
+# saveRDS(pollen_data, paste0(savepath, "Details_2026-11-09.rds"))
