@@ -28,13 +28,13 @@ df_old <-  readRDS(paste0(savepath, "MasterPollenData.rds"))
 #| echo: false
 #| warning: false
 
-file_list <- list.files(path=paste0("data/", savepath), 
+file_list <- list.files(path=paste0(savepath), 
                         pattern="pollen-count-archive-*")
 
 for (file in file_list){
   print(file)
-  fileout <- paste0("data/", savepath, file, ".rds")
-  df2 <- read_excel(paste0("data/", savepath, file), col_names=FALSE)  
+  fileout <- paste0(savepath, file, ".rds")
+  df2 <- read_excel(paste0( savepath, file), col_names=FALSE)  
   saveRDS(df2, fileout)
 }
 ```
