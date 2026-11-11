@@ -8,9 +8,6 @@ format: html
 #| echo: false
 #| warning: false
 
-# Install packages if you haven't already
-# install.packages(c("rvest", "tidyverse"))
-
 library(rvest)
 library(tidyverse)
 
