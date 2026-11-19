@@ -1,0 +1,53 @@
+---
+title: "Create Diocese Polygons"
+author: "Alan Jackson"
+format: html
+---
+
+##  Create polygon outlines for dioceses
+
+```{r setup}
+#| echo: false
+
+library(tidyverse)
+library(lubridate)
+library(readxl) # read excel files
+
+savepath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/"
+path <- "/home/ajackson/Dropbox/Rprojects/Eco_regions/Data/"
+
+####   counties in Central Gulf Coast diocese
+
+CGC_Florida <- c("Escambia", "Santa Rosa", "Okaloosa", "Walton", "Holmes", "Washington", "Bay", "Jackson", "Calhoun", "Gulf")
+CGC_Alabama <- c("Choctaw", "Clarke", "Washington", "Mobile", "Baldwin", "Wilcox", "Monroe", "Conehcuh", "Escambia", "Butler", "Covington", "Pike", "Crenshaw", "Coffee", "Geneva", "Barbour", "Dale", "Henry", "Houston")
+
+####  counties in Diocese of Louisiana
+
+Louisiana <- c("Ascension", "Assumption", "East Baton Rouge", "East Feliciana", "Iberville", "Jefferson", "Lafourche", "Livingston", "Orleans", "Plaquemines", "Pointe Coupee", "St. Bernard", "St. Charles", "St. Helena", "St. James", "St. John the Baptist", "St. Mary", "St. Tammany", "Tangipahoa", "Terrebonne", "Washington", "West Baton Rouge", "West Feliciana")
+
+####  counties in diocese of West Texas
+
+WTexas <- c("Aransas", "Atascosa", "Bandera", "Bee", "Bexar", "Blanco", "Brooks", "Caldwell", "Calhoun", "Cameron", "Comal", "Concho", "Crockett", "DeWitt", "Dimmit", "Duval", "Edwards", "Frio", "Gillespie", "Goliad", "Gonzales", "Guadalupe", "Hays", "Hidalgo", "Jackson", "Jim Hogg", "Jim Wells", "Karnes", "Kendall", "Kenedy", "Kerr", "Kimble", "Kinney", "Kleberg", "La Salle", "Lavaca", "Live Oak", "Llano", "Mason", "Maverick", "McCulloch", "McMullen", "Medina", "Menard", "Nueces", "Real", "Refugio", "San Patricio", "San Saba", "Schleicher", "Starr", "Sutton", "Uvalde", "Val Verde", "Victoria", "Webb", "Willacy", "Wilson", "Zapata", "Zavala")
+
+```
+
+##  Process the data
+
+- read in the county map for the whole state
+- select out only the needed counties
+- dissolve the lines between counties
+
+
+```{r}
+#| echo: false
+#| warning: false
+
+
+
+```
+
+
+
+
+
+
