@@ -10,16 +10,30 @@ format: html
 #| echo: false
 
 library(tidyverse)
-library(lubridate)
-library(readxl) # read excel files
+library(sf)
 
-savepath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/"
+GoogleCRS <- 4326
+
+savepath <- "/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Dioceses/"
 path <- "/home/ajackson/Dropbox/Rprojects/Eco_regions/Data/"
 
 ####   counties in Central Gulf Coast diocese
 
 CGC_Florida <- c("Escambia", "Santa Rosa", "Okaloosa", "Walton", "Holmes", "Washington", "Bay", "Jackson", "Calhoun", "Gulf")
-CGC_Alabama <- c("Choctaw", "Clarke", "Washington", "Mobile", "Baldwin", "Wilcox", "Monroe", "Conehcuh", "Escambia", "Butler", "Covington", "Pike", "Crenshaw", "Coffee", "Geneva", "Barbour", "Dale", "Henry", "Houston")
+#   just a sliver of Franklin
+Sliver <- c("-85.2427327 29.6891527", "-85.1651418 29.7043624", "-85.1187932 29.71629", "-85.0978505 29.7183772", "-85.0724446 29.7186754", "-85.0508153 29.7147992", "-85.0405156 29.7130101", "-85.0367391 29.7088355", "-85.0326192 29.7085373", "-85.0254094 29.7124137", "-85.0140798 29.7142028", "-85.0024068 29.7136065", "-84.9876439 29.7171846", "-84.9818074 29.7213589", "-84.9763143 29.7249367", "-84.9842107 29.7311976", "-84.9934804 29.7395448", "-85.0000035 29.7449105", "-85.0072133 29.7475933", "-85.0130498 29.7541508", "-85.0199163 29.7598138", "-85.027126 29.7651784", "-85.0374257 29.7657745", "-85.0425756 29.7702448", "-85.0477254 29.7759068", "-85.0521886 29.7800787", "-85.0590551 29.7854422", "-85.0655782 29.78723", "-85.0703847 29.7821645", "-85.0703847 29.7768008", "-85.0721013 29.7708408", "-85.0789678 29.7681587", "-85.0885808 29.7717348", "-85.0995671 29.7735229", "-85.1091802 29.7762048", "-85.2427327 29.6891527") 
+
+Sliver <- 
+  tibble(raw=trimws(Sliver)) |>
+  mutate(raw = trimws(raw)) |>
+  separate_wider_delim(raw, delim = " ", names = c("Long", "Lat")) |>
+  mutate(across(c(Long, Lat), as.numeric)) |> 
+  st_as_sf(coords = c("Long", "Lat"), crs = GoogleCRS) |>
+  summarise(geometry = st_combine(geometry)) |>
+  st_cast("POLYGON")
+
+CGC_Alabama <- c("Baldwin", "Barbour", "Bullock", "Butler", "Choctaw", "Clarke", "Coffee", "Conecuh", "Covington", "Crenshaw", "Dale", "Escambia", "Geneva", "Henry", "Houston", "Lowndes", "Macon", "Mobile", "Monroe", "Pike", "Russell", "Washington", "Wilcox")
+ 
 
 ####  counties in Diocese of Louisiana
 
@@ -27,7 +41,8 @@ Louisiana <- c("Ascension", "Assumption", "East Baton Rouge", "East Feliciana", 
 
 ####  counties in diocese of West Texas
 
-WTexas <- c("Aransas", "Atascosa", "Bandera", "Bee", "Bexar", "Blanco", "Brooks", "Caldwell", "Calhoun", "Cameron", "Comal", "Concho", "Crockett", "DeWitt", "Dimmit", "Duval", "Edwards", "Frio", "Gillespie", "Goliad", "Gonzales", "Guadalupe", "Hays", "Hidalgo", "Jackson", "Jim Hogg", "Jim Wells", "Karnes", "Kendall", "Kenedy", "Kerr", "Kimble", "Kinney", "Kleberg", "La Salle", "Lavaca", "Live Oak", "Llano", "Mason", "Maverick", "McCulloch", "McMullen", "Medina", "Menard", "Nueces", "Real", "Refugio", "San Patricio", "San Saba", "Schleicher", "Starr", "Sutton", "Uvalde", "Val Verde", "Victoria", "Webb", "Willacy", "Wilson", "Zapata", "Zavala")
+WTexas <- c("Aransas", "Atascosa", "Bandera", "Bee", "Bexar", "Blanco", "Brooks", "Caldwell", "Calhoun", "Cameron", "Comal", "Concho", "Crockett", "De Witt", "Dimmit", "Duval", "Edwards", "Frio", "Gillespie", "Goliad", "Gonzales", "Guadalupe", "Hays", "Hidalgo", "Jackson", "Jim Hogg", "Jim Wells", "Karnes", "Kendall", "Kenedy", "Kerr", "Kimble", "Kinney", "Kleberg", "La Salle", "Lavaca", "Live Oak", "Llano", "Mason", "Maverick", "McCulloch", "McMullen", "Medina", "Menard", "Nueces", "Real", "Refugio", "San Patricio", "San Saba", "Schleicher", "Starr", "Sutton", "Uvalde", "Val Verde", "Victoria", "Webb", "Willacy", "Wilson", "Zapata", "Zavala")
+#   Note that DeWitt is misspelled to match the geometry file
 
 ```
 
@@ -37,12 +52,157 @@ WTexas <- c("Aransas", "Atascosa", "Bandera", "Bee", "Bexar", "Blanco", "Brooks"
 - select out only the needed counties
 - dissolve the lines between counties
 
+### Diocese of the Central Gulf Coast
 
 ```{r}
 #| echo: false
 #| warning: false
 
+###################################################
+#   Diocese of the Central Gulf Coast
+###################################################
 
+#     Read shape file
+counties_sf <- st_read(paste0(path, "Florida_Counties_1%3A24000/Florida_Counties_1%3A24000.shp"))
+#     Transform to Google CRS geographic coordinates
+counties_sf <- st_transform(counties_sf, crs = GoogleCRS)
+#     Select out the desired counties
+selected_counties <- counties_sf %>%
+  filter(COUNTY %in% CGC_Florida)
+
+plot(selected_counties)
+plot(Sliver)
+Slivera <- st_difference(Sliver, st_union(selected_counties))
+plot(Slivera)
+ggplot() +
+  geom_sf(data=Sliver, color="navy") +
+  geom_sf(data=Slivera, color="red") 
+New_Florida <- bind_rows(selected_counties, Slivera) 
+plot(New_Florida)
+
+#   Now do Alabama
+
+#     Read shape file
+counties_sfa <- st_read(paste0(path, "Alabama_Counties-shp/"))
+#     Transform to Google CRS geographic coordinates
+counties_sfa <- st_transform(counties_sfa, crs = GoogleCRS)
+#     Select out the desired counties
+Alabama <- counties_sfa %>%
+  filter(NAME %in% CGC_Alabama) |> 
+  rename(COUNTY=NAME)
+
+plot(Alabama)
+
+#   Combine them all
+
+# CGC <- st_union(st_geometry(New_Florida), st_geometry(Alabama)) |>
+  # st_sf()
+
+CGC <- c(st_geometry(New_Florida), st_geometry(Alabama)) |>
+  st_make_valid() |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+
+# CGC <- bind_rows(
+#   select(New_Florida, geometry),
+#   select(Alabama, geometry)
+# ) |>
+#   summarise()
+
+plot(CGC)
+
+saveRDS(CGC, paste0(savepath, "Diocese_Central_Gulf_Coast_outline.rds"))
+
+
+###################################################
+#   Diocese of Mississippi
+###################################################
+
+#     Read shape file
+counties_sf <- st_read(paste0(path, "MS_CountyBoundaries_2015"))
+#     Transform to Google CRS geographic coordinates
+counties_sf <- st_transform(counties_sf, crs = GoogleCRS)
+
+plot(counties_sf)
+
+Miss <- st_geometry(counties_sf) |>
+  st_make_valid() |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+
+plot(Miss)
+
+saveRDS(Miss, paste0(savepath, "Diocese_Mississippi_outline.rds"))
+
+###################################################
+#   Diocese of Louisiana
+###################################################
+
+#     Read shape file
+counties_sf <- st_read(paste0(path, "Parishes"))#     Transform to Google CRS geographic coordinates
+counties_sf <- st_transform(counties_sf, crs = GoogleCRS)
+#     Select out the desired counties
+selected_counties <- counties_sf %>%
+  filter(ParishName %in% Louisiana)
+
+plot(selected_counties)
+
+LA <- st_geometry(selected_counties) |>
+  # st_make_valid() |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+
+plot(LA)
+
+saveRDS(LA, paste0(savepath, "Diocese_Louisiana_outline.rds"))
+
+###################################################
+#   Diocese of West Texas
+###################################################
+
+Texas <- readRDS("/home/ajackson/Dropbox/Rprojects/Curated_Data_Files/Texas_Counties/County_Outlines.rds")
+
+#     Select out the desired counties
+selected_counties <- Texas %>%
+  filter(CNTY_NM %in% WTexas)
+
+plot(selected_counties)
+
+WestTex <- st_geometry(selected_counties) |>
+  st_make_valid() |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+
+plot(WestTex)
+
+saveRDS(WestTex, paste0(savepath, "Diocese_WestTexas_outline.rds"))
+
+###################################################
+#   Diocese of Texas
+###################################################
+
+Texas <- readRDS("/home/ajackson/Dropbox/Rprojects/TexasDioceseCreationCare/Data/Convocations.rds")
+
+plot(Texas)
+
+Tex <- st_geometry(Texas) |>
+  st_make_valid() |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+
+plot(Tex)
+
+saveRDS(Tex, paste0(savepath, "Diocese_Texas_outline.rds"))
 
 ```
 
