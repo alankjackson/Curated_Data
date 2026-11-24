@@ -163,6 +163,31 @@ plot(LA)
 saveRDS(LA, paste0(savepath, "Diocese_Louisiana_outline.rds"))
 
 ###################################################
+#   Diocese of Western Louisiana
+###################################################
+
+#     Read shape file
+counties_sf <- st_read(paste0(path, "Parishes"))#     Transform to Google CRS geographic coordinates
+counties_sf <- st_transform(counties_sf, crs = GoogleCRS)
+#     Select out the desired counties
+selected_counties <- counties_sf %>%
+  filter(ParishName %notin% Louisiana)
+
+plot(selected_counties)
+
+WLA <- st_geometry(selected_counties) |>
+  # st_make_valid() |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+
+plot(WLA)
+
+saveRDS(WLA, paste0(savepath, "Diocese_Western_Louisiana_outline.rds"))
+
+
+###################################################
 #   Diocese of West Texas
 ###################################################
 
