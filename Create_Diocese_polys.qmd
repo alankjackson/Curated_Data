@@ -437,11 +437,15 @@ Nebraska <- states(cb = TRUE) |>
 
 plot(Nebraska)
 
+saveRDS(Nebraska, paste0(savepath, "Diocese_Nebraska_outline.rds"))
+
 NDakota <- states(cb = TRUE) |>
   filter(STUSPS == "ND") |>
   st_transform(GoogleCRS)
 
 plot(NDakota)
+
+saveRDS(NDakota, paste0(savepath, "Diocese_NDakota_outline.rds"))
 
 SDakota <- states(cb = TRUE) |>
   filter(STUSPS == "SD") |>
@@ -449,11 +453,15 @@ SDakota <- states(cb = TRUE) |>
 
 plot(SDakota)
 
+saveRDS(SDakota, paste0(savepath, "Diocese_SDakota_outline.rds"))
+
 Iowa <- states(cb = TRUE) |>
   filter(STUSPS == "IA") |>
   st_transform(GoogleCRS)
 
 plot(Iowa)
+
+saveRDS(Iowa, paste0(savepath, "Diocese_Iowa_outline.rds"))
 
 Montana <- states(cb = TRUE) |>
   filter(STUSPS == "MT") |>
@@ -461,11 +469,15 @@ Montana <- states(cb = TRUE) |>
 
 plot(Montana)
 
+saveRDS(Montana, paste0(savepath, "Diocese_Montana_outline.rds"))
+
 Colorado <- states(cb = TRUE) |>
   filter(STUSPS == "CO") |>
   st_transform(GoogleCRS)
 
 plot(Colorado)
+
+saveRDS(Colorado, paste0(savepath, "Diocese_Colorado_outline.rds"))
 
 ###################################################
 #   Diocese of Wyoming
@@ -486,6 +498,8 @@ wy_minus_alta <- st_difference(
 
 plot(Wyoming)
 plot(wy_minus_alta)
+
+saveRDS(wy_minus_alta, paste0(savepath, "Diocese_Wyoming_outline.rds"))
 
 ###################################################
 #   Diocese of Navaho Land
