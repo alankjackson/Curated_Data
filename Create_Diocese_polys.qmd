@@ -70,9 +70,7 @@ RioGrande_TX <- c("Brewster", "Culberson", "El Paso", "Hudspeth", "Jeff Davis", 
 
 Idaho_ID <- c("Ada", "Adams", "Bannock", "Bear Lake", "Bingham", "Blaine", "Boise", "Bonneville", "Butte", "Camas", "Canyon", "Caribou", "Cassia", "Clark", "Custer", "Elmore", "Franklin", "Fremont", "Gem", "Gooding", "Jefferson", "Jerome", "Lemhi", "Lincoln", "Madison", "Minidoka", "Oneida", "Owyhee", "Payette", "Power", "Teton", "Twin Falls", "Valley", "Washington")
 
-Idaho_Wy <- c("Teton")
-
-
+#   Alta wyoming gets added to Idaho
 
 ```
 
@@ -403,7 +401,7 @@ plot(st_geometry(idaho_county), border = "gray70", lty = 2, main = "Idaho County
 plot(st_geometry(idaho_county_south), col = "lightblue", border = "navy", add = TRUE)
 plot(st_geometry(salmon_river), col = "blue", lwd = 2, add = TRUE)
 
-#   Extract needed counties from Idaho and Wyoming, and then combine all.
+#   Extract needed counties from Idaho and sliver from Wyoming, and then combine all.
 
 #     Select out the desired counties
 selected_counties_id <- id_counties %>%
@@ -411,12 +409,13 @@ selected_counties_id <- id_counties %>%
 
 plot(selected_counties_id)
 
-selected_counties_wy <- wy_counties %>%
-  filter(NAME %in% Idaho_Wy)
+alta_wy <- places(state = "WY", cb = TRUE) |>
+  filter(GEOID == "5601985") |>
+  st_transform(4326)
 
-plot(selected_counties_wy)
+plot(alta_wy)
 
-combined <- c(st_geometry(selected_counties_wy), 
+combined <- c(st_geometry(alta_wy), 
                st_geometry(selected_counties_id),
                st_geometry(idaho_county_south))
 
@@ -427,6 +426,78 @@ Idaho <- Erase_counties(combined)
 plot(Idaho)
 
 saveRDS(Idaho, paste0(savepath, "Diocese_Idaho_outline.rds"))
+
+###################################################
+#   Dioceses of Nebraska, North & South Dakota, Iowa, Montana, Colorado 
+###################################################
+
+Nebraska <- states(cb = TRUE) |>
+  filter(STUSPS == "NE") |>
+  st_transform(GoogleCRS)
+
+plot(Nebraska)
+
+NDakota <- states(cb = TRUE) |>
+  filter(STUSPS == "ND") |>
+  st_transform(GoogleCRS)
+
+plot(NDakota)
+
+SDakota <- states(cb = TRUE) |>
+  filter(STUSPS == "SD") |>
+  st_transform(GoogleCRS)
+
+plot(SDakota)
+
+Iowa <- states(cb = TRUE) |>
+  filter(STUSPS == "IA") |>
+  st_transform(GoogleCRS)
+
+plot(Iowa)
+
+Montana <- states(cb = TRUE) |>
+  filter(STUSPS == "MT") |>
+  st_transform(GoogleCRS)
+
+plot(Montana)
+
+Colorado <- states(cb = TRUE) |>
+  filter(STUSPS == "CO") |>
+  st_transform(GoogleCRS)
+
+plot(Colorado)
+
+###################################################
+#   Diocese of Wyoming
+###################################################
+
+#   All of Wyoming, but subtract alta_wy
+
+Wyoming <- states(cb = TRUE) |>
+  filter(STUSPS == "WY") |>
+  st_transform(GoogleCRS) |>
+  st_make_valid()
+
+# Subtract Alta's polygon from Wyoming
+wy_minus_alta <- st_difference(
+  Wyoming,
+  st_union(st_geometry(alta_wy))
+)
+
+plot(Wyoming)
+plot(wy_minus_alta)
+
+###################################################
+#   Diocese of Navaho Land
+###################################################
+
+
+
+###################################################
+#   Diocese of The Rio Grande
+###################################################
+
+#   New Mexico minus Navaho Land, plus a bit of Texas
 
 
 ```
