@@ -11,6 +11,7 @@ format: html
 
 library(tidyverse)
 library(sf)
+library(tigris)
 
 GoogleCRS <- 4326
 
@@ -44,9 +45,53 @@ Louisiana <- c("Ascension", "Assumption", "East Baton Rouge", "East Feliciana", 
 WTexas <- c("Aransas", "Atascosa", "Bandera", "Bee", "Bexar", "Blanco", "Brooks", "Caldwell", "Calhoun", "Cameron", "Comal", "Concho", "Crockett", "De Witt", "Dimmit", "Duval", "Edwards", "Frio", "Gillespie", "Goliad", "Gonzales", "Guadalupe", "Hays", "Hidalgo", "Jackson", "Jim Hogg", "Jim Wells", "Karnes", "Kendall", "Kenedy", "Kerr", "Kimble", "Kinney", "Kleberg", "La Salle", "Lavaca", "Live Oak", "Llano", "Mason", "Maverick", "McCulloch", "McMullen", "Medina", "Menard", "Nueces", "Real", "Refugio", "San Patricio", "San Saba", "Schleicher", "Starr", "Sutton", "Uvalde", "Val Verde", "Victoria", "Webb", "Willacy", "Wilson", "Zapata", "Zavala")
 #   Note that DeWitt is misspelled to match the geometry file
 
+###################################  Grasslands
+
+####  counties in diocese of Kansas
+
+Kansas <- c("Allen", "Anderson", "Atchison", "Bourbon", "Brown", "Butler", "Chase", "Chautauqua", "Cherokee", "Clay", "Coffey", "Cowley", "Crawford", "Dickinson", "Doniphan", "Douglas", "Elk", "Franklin", "Geary", "Greenwood", "Harvey", "Jackson", "Jefferson", "Johnson", "Labette", "Leavenworth", "Linn", "Lyon", "Marion", "Marshall", "Miami", "Montgomery", "Morris", "Nemaha", "Neosho", "Osage", "Pottawatomie", "Riley", "Sedgwick", "Shawnee", "Sumner", "Wabaunsee", "Washington", "Wilson", "Woodson", "Wyandotte")
+
+####  counties in diocese of Western Kansas
+
+WKansas <- c("Barber", "Barton", "Cheyenne", "Clark", "Cloud", "Comanche", "Decatur", "Edwards", "Ellis", "Ellsworth", "Finney", "Ford", "Gove", "Graham", "Grant", "Gray", "Greeley", "Hamilton", "Harper", "Haskell", "Hodgeman", "Jewell", "Kearny", "Kingman", "Kiowa", "Lane", "Lincoln", "Logan", "McPherson", "Meade", "Mitchell", "Morton", "Ness", "Norton", "Osborne", "Ottawa", "Pawnee", "Phillips", "Pratt", "Rawlins", "Reno", "Republic", "Rice", "Rooks", "Rush", "Russell", "Saline", "Scott", "Seward", "Sheridan", "Sherman", "Smith", "Stanton", "Stevens", "St John", "Thomas", "Trego", "Wallace", "and Wichita")
+
+####  counties in diocese of Northwest Texas
+
+NWTexas <- c("Andrews", "Armstrong", "Bailey", "Borden", "Briscoe", "Callahan", "Carson", "Castro", "Childress", "Cochran", "Coke", "Coleman", "Collingsworth", "Concho", "Cottle", "Crane", "Crosby", "Dallam", "Dawson", "Deaf Smith", "Dickens", "Donley", "Ector", "Fisher", "Floyd", "Foard", "Gaines", "Garza", "Glasscock", "Gray", "Hale", "Hall", "Hansford", "Hardeman", "Hartley", "Haskell", "Hemphill", "Hockley", "Howard", "Hutchinson", "Irion", "Jones", "Kent", "King", "Knox", "Lamb", "Lipscomb", "Loving", "Lubbock", "Lynn", "Martin", "Midland", "Mitchell", "Moore", "Motley", "Nolan", "Ochiltree", "Oldham", "Parmer", "Potter", "Randall", "Reagan", "Roberts", "Runnels", "Schleicher", "Scurry", "Shackelford", "Sherman", "Sterling", "Stonewall", "Swisher", "Taylor", "Terry", "Tom Green", "Upton", "Ward", "Wheeler", "Winkler", "Yoakum")
+
+####  counties in diocese of the Rio Grande
+
+RioGrande_NM <- c("Bernalillo", "Catron", "Chaves", "Cibola", "Colfax", "Curry", "De Baca", "Doña Ana", "Eddy", "Grant", "Guadalupe", "Harding", "Hidalgo", "Lea", "Lincoln", "Los Alamos", "Luna", "McKinley", "Mora", "Otero", "Quay", "Rio Arriba", "Roosevelt", "San Juan", "San Miguel", "Sandoval", "Santa Fe", "Sierra", "Socorro", "Taos", "Torrance", "Union", "Valencia")
+
+RioGrande_TX <- c("Brewster", "Culberson", "El Paso", "Hudspeth", "Jeff Davis", "Pecos", "Presidio", "Reeves", "Terrell")
+
+####  counties in diocese of Idaho
+# (Note: Idaho County is split geographically by the Salmon River)
+
+Idaho_ID <- c("Ada", "Adams", "Bannock", "Bear Lake", "Bingham", "Blaine", "Boise", "Bonneville", "Butte", "Camas", "Canyon", "Caribou", "Cassia", "Clark", "Custer", "Elmore", "Franklin", "Fremont", "Gem", "Gooding", "Jefferson", "Jerome", "Lemhi", "Lincoln", "Madison", "Minidoka", "Oneida", "Owyhee", "Payette", "Power", "Teton", "Twin Falls", "Valley", "Washington")
+
+Idaho_Wy <- c("Teton")
+
+
+
 ```
 
-##  Process the data
+##    define a function for processing the counties
+
+```{r}
+#| echo: false
+#| warning: false
+
+Erase_counties <- function(selected_counties) {
+  foo <- st_geometry(selected_counties) |>
+  st_buffer(0.0003) |> # Adjust distance to match your CRS units (e.g., meters vs. degrees)
+  st_union() |>
+  st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
+  st_cast("POLYGON")
+}
+
+```
+##  Process the data from shape files
 
 - read in the county map for the whole state
 - select out only the needed counties
@@ -231,8 +276,35 @@ saveRDS(Tex, paste0(savepath, "Diocese_Texas_outline.rds"))
 
 ```
 
+##    Process data from census files
 
+```{r}
+#| echo: false
+#| warning: false
 
+# Cache downloaded shapefiles locally so repeated runs don't re-download
+options(tigris_use_cache = TRUE)
+
+# Download Kansas counties as an sf object (1:500k cartographic boundary)
+# accepts state name, abbreviation, or FIPS
+ks_counties <- counties(state = "KS", cb = TRUE)|>
+  st_transform(GoogleCRS) 
+
+plot(ks_counties)
+
+#     Select out the desired counties
+selected_counties <- ks_counties %>%
+  filter(NAME %in% Kansas)
+
+plot(selected_counties)
+
+KS <- Erase_counties(selected_counties)
+
+plot(KS)
+
+saveRDS(KS, paste0(savepath, "Diocese_Kansas_outline.rds"))
+
+```
 
 
 
