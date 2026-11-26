@@ -53,7 +53,7 @@ Kansas <- c("Allen", "Anderson", "Atchison", "Bourbon", "Brown", "Butler", "Chas
 
 ####  counties in diocese of Western Kansas
 
-WKansas <- c("Barber", "Barton", "Cheyenne", "Clark", "Cloud", "Comanche", "Decatur", "Edwards", "Ellis", "Ellsworth", "Finney", "Ford", "Gove", "Graham", "Grant", "Gray", "Greeley", "Hamilton", "Harper", "Haskell", "Hodgeman", "Jewell", "Kearny", "Kingman", "Kiowa", "Lane", "Lincoln", "Logan", "McPherson", "Meade", "Mitchell", "Morton", "Ness", "Norton", "Osborne", "Ottawa", "Pawnee", "Phillips", "Pratt", "Rawlins", "Reno", "Republic", "Rice", "Rooks", "Rush", "Russell", "Saline", "Scott", "Seward", "Sheridan", "Sherman", "Smith", "Stanton", "Stevens", "St John", "Thomas", "Trego", "Wallace", "and Wichita")
+WKansas <- c("Barber", "Barton", "Cheyenne", "Clark", "Cloud", "Comanche", "Decatur", "Edwards", "Ellis", "Ellsworth", "Finney", "Ford", "Gove", "Graham", "Grant", "Gray", "Greeley", "Hamilton", "Harper", "Haskell", "Hodgeman", "Jewell", "Kearny", "Kingman", "Kiowa", "Lane", "Lincoln", "Logan", "McPherson", "Meade", "Mitchell", "Morton", "Ness", "Norton", "Osborne", "Ottawa", "Pawnee", "Phillips", "Pratt", "Rawlins", "Reno", "Republic", "Rice", "Rooks", "Rush", "Russell", "Saline", "Scott", "Seward", "Sheridan", "Sherman", "Smith", "Stafford", "Stanton", "Stevens", "St John", "Thomas", "Trego", "Wallace", "Wichita")
 
 ####  counties in diocese of Northwest Texas
 
@@ -285,6 +285,11 @@ saveRDS(Tex, paste0(savepath, "Diocese_Texas_outline.rds"))
 # Cache downloaded shapefiles locally so repeated runs don't re-download
 options(tigris_use_cache = TRUE)
 
+
+###################################################
+#   Diocese of Kansas
+###################################################
+
 # Download Kansas counties as an sf object (1:500k cartographic boundary)
 # accepts state name, abbreviation, or FIPS
 ks_counties <- counties(state = "KS", cb = TRUE)|>
@@ -303,6 +308,26 @@ KS <- Erase_counties(selected_counties)
 plot(KS)
 
 saveRDS(KS, paste0(savepath, "Diocese_Kansas_outline.rds"))
+
+###################################################
+#   Diocese of Western Kansas
+###################################################
+
+#     Select out the desired counties
+selected_counties <- ks_counties %>%
+  filter(NAME %in% WKansas)
+
+plot(selected_counties)
+
+WKS <- Erase_counties(selected_counties)
+
+plot(WKS)
+
+saveRDS(WKS, paste0(savepath, "Diocese_Western_Kansas_outline.rds"))
+
+
+
+
 
 ```
 
