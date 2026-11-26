@@ -88,6 +88,8 @@ Erase_counties <- function(selected_counties) {
   st_union() |>
   st_collection_extract("POLYGON") |> # Drops any stray lines/points if present
   st_cast("POLYGON")
+  
+  foo
 }
 
 ```
@@ -325,8 +327,106 @@ plot(WKS)
 
 saveRDS(WKS, paste0(savepath, "Diocese_Western_Kansas_outline.rds"))
 
+###################################################
+#   Diocese of Northwest Texas
+###################################################
 
+# Download Texas counties as an sf object (1:500k cartographic boundary)
+# accepts state name, abbreviation, or FIPS
+tx_counties <- counties(state = "TX", cb = TRUE)|>
+  st_transform(GoogleCRS) 
 
+plot(tx_counties)
+
+#     Select out the desired counties
+selected_counties <- tx_counties %>%
+  filter(NAME %in% NWTexas)
+
+plot(selected_counties)
+
+NWTX <- Erase_counties(selected_counties)
+
+plot(NWTX)
+
+saveRDS(NWTX, paste0(savepath, "Diocese_Northwest_Texas_outline.rds"))
+
+###################################################
+#   Diocese of Idaho 
+###################################################
+
+id_counties <- counties(state = "ID", cb = TRUE)|>
+  st_transform(GoogleCRS)
+plot(id_counties)
+wy_counties <- counties(state = "WY", cb = TRUE)|>
+  st_transform(GoogleCRS)
+plot(wy_counties)
+
+#   Need to create a polygon for the part of Idaho county south of the Salmon river
+
+# library(lwgeom)
+
+# 1. Download Idaho County boundary
+idaho_county <- counties(state = "ID", cb = FALSE, year = 2023) %>%
+  filter(NAME == "Idaho")  
+
+# 2. Download linear water features for Idaho County and filter for the Salmon River
+# Note: Use st_union() and st_line_merge() so the river acts as a continuous blade
+salmon_river <- linear_water(state = "ID", county = "Idaho", year = 2023) %>%
+  filter(FULLNAME == "Salmon Riv") %>%
+  st_union() %>%
+  st_line_merge()  
+
+# Ensure both layers share the exact same CRS
+salmon_river <- st_transform(salmon_river, st_crs(idaho_county))
+
+# 3. Split the county polygon using the river line
+# Note: Disable S2 spherical geometry temporarily so planar splitting works cleanly
+sf_use_s2(FALSE)
+split_geoms <- lwgeom::st_split(idaho_county, salmon_river) %>%
+  st_collection_extract("POLYGON")
+sf_use_s2(TRUE)
+
+# 4. Filter to keep only the polygon(s) south of the river
+# A reliable method is selecting the split piece with the lowest centroid latitude,
+# or keeping pieces with centroids south of ~45.42° N (Riggins / Salmon River bend).
+idaho_county_south <- split_geoms %>%
+  mutate(
+    area = as.numeric(st_area(.)),
+    centroid_lat = st_coordinates(st_centroid(.))[, 2]
+  ) %>%
+  # Filter out tiny river-island slivers and keep the main southern portion
+  filter(area > 1e7, centroid_lat < 45.45) |> 
+  st_transform(GoogleCRS)
+
+# 5. Plot to verify the result
+plot(st_geometry(idaho_county), border = "gray70", lty = 2, main = "Idaho County (South of Salmon River)")
+plot(st_geometry(idaho_county_south), col = "lightblue", border = "navy", add = TRUE)
+plot(st_geometry(salmon_river), col = "blue", lwd = 2, add = TRUE)
+
+#   Extract needed counties from Idaho and Wyoming, and then combine all.
+
+#     Select out the desired counties
+selected_counties_id <- id_counties %>%
+  filter(NAME %in% Idaho_ID)
+
+plot(selected_counties_id)
+
+selected_counties_wy <- wy_counties %>%
+  filter(NAME %in% Idaho_Wy)
+
+plot(selected_counties_wy)
+
+combined <- c(st_geometry(selected_counties_wy), 
+               st_geometry(selected_counties_id),
+               st_geometry(idaho_county_south))
+
+plot(combined)
+
+Idaho <- Erase_counties(combined)
+
+plot(Idaho)
+
+saveRDS(Idaho, paste0(savepath, "Diocese_Idaho_outline.rds"))
 
 
 ```
