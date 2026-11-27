@@ -505,7 +505,49 @@ saveRDS(wy_minus_alta, paste0(savepath, "Diocese_Wyoming_outline.rds"))
 #   Diocese of Navaho Land
 ###################################################
 
+# 1. Pull Navajo Nation geometry and transform to EPSG:4326
+navajo_raw <- native_areas(cb = TRUE) |>
+  filter(grepl("Navajo", NAME, ignore.case = TRUE)) |>
+  st_transform(GoogleCRS) |>
+  st_make_valid()
 
+plot(navajo_raw)
+
+# Combine into a single geometry if split across rows, then explode into individual POLYGONs
+navajo_parts <- navajo_raw |>
+  summarise(geometry = st_union(geometry)) |>
+  st_make_valid() |>
+  st_cast("POLYGON")
+
+plot(navajo_parts)
+
+# 2. Keep only the largest polygon (preserves its interior ring / hole while dropping small satellites)
+navajo_main <- navajo_parts |>
+  mutate(area_m2 = as.numeric(st_area(geometry))) |>
+  slice_max(area_m2, n = 1) |>
+  select(-area_m2)
+
+plot(navajo_main)
+
+# Inspect hole areas (in square meters) on the main polygon
+poly_rings <- navajo_main$geometry[[1]]
+if (length(poly_rings) > 1) {
+  hole_areas <- sapply(poly_rings[-1], function(ring) {
+    as.numeric(st_area(st_polygon(list(ring))))
+  })
+  print(sort(hole_areas, decreasing = TRUE))
+
+  # Keep outer ring + only holes larger than, say, 100 sq km (1e8 m^2)
+  keep_holes <- poly_rings[-1][hole_areas > 1e-1]
+  navajo_main$geometry <- st_sfc(
+    st_polygon(c(list(poly_rings[[1]]), keep_holes)),
+    crs = GoogleCRS
+  )
+}
+
+plot(navajo_main)
+
+saveRDS(navajo_main, paste0(savepath, "Diocese_Navajo_Land_outline.rds"))
 
 ###################################################
 #   Diocese of The Rio Grande
