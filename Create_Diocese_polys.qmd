@@ -555,6 +555,61 @@ saveRDS(navajo_main, paste0(savepath, "Diocese_Navajo_Land_outline.rds"))
 
 #   New Mexico minus Navaho Land, plus a bit of Texas
 
+NM_counties <-  counties(state = "NM", cb = TRUE) |>
+  filter(STUSPS == "NM") |>
+  st_transform(GoogleCRS) |>
+  st_make_valid()
+
+#     Select out the desired counties
+selected_counties <- NM_counties %>%
+  filter(NAME %in% RioGrande_NM)
+
+plot(selected_counties)
+
+# Subtract Navaho Land's polygon from Wyoming
+
+selected_counties <- st_difference(
+  selected_counties,
+  st_union(st_geometry(navajo_main))
+)
+
+plot(selected_counties)
+
+RG_NM <- Erase_counties(selected_counties)
+
+plot(RG_NM)
+
+#   Texas counties for diocese
+
+#     Select out the desired counties
+selected_counties <- tx_counties %>%
+  filter(NAME %in% RioGrande_TX)
+
+plot(selected_counties)
+
+RioGTX <- Erase_counties(selected_counties)
+
+plot(RioGTX)
+
+#   Combine and save
+
+combined <- c(st_geometry(RioGTX), 
+               st_geometry(RG_NM)) |> 
+  st_make_valid() |>
+  st_simplify(dTolerance = 0, preserveTopology = TRUE) |>
+  st_make_valid()
+
+plot(combined)
+
+Rio_Grande <- Erase_counties(combined)
+
+plot(Rio_Grande)
+
+saveRDS(Rio_Grande, paste0(savepath, "Diocese_Rio_Grande_outline.rds"))
+
+
+
+
 
 ```
 
